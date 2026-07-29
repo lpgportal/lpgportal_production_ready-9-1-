@@ -3,7 +3,7 @@
 # ====================================================
 
 # Step 1: Build Application
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -12,7 +12,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # Step 2: Production Execution Image
-FROM node:20-alpine
+FROM node:20-slim
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
