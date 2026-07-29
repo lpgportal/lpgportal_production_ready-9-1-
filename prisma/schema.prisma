@@ -1,0 +1,324 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  visitor
+  vehicle_owner
+  dealer
+  engineer
+  manufacturer
+  admin
+}
+
+enum MembershipStatus {
+  Aktif
+  Pasif
+  SuresiDolmus
+  Beklemede
+  Iptal
+  OnayBekliyor
+  AskiyaAlindi
+}
+
+model User {
+  id                      String           @id @default(uuid())
+  name                    String
+  email                   String           @unique
+  phone                   String           @unique
+  password                String
+  role                    Role             @default(visitor)
+  membershipType          String
+  membershipFee           Float
+  membershipStart         DateTime         @default(now())
+  membershipEnd           DateTime
+  membershipStatus        MembershipStatus @default(OnayBekliyor)
+  createdAt               DateTime         @default(now())
+  
+  // Custom Registration Fields
+  companyName             String?
+  authorizedName          String?
+  taxInfo                 String?
+  website                 String?
+  city                    String?
+  district                String?
+  expertise               String?
+  brandName               String?
+  authorizedPerson        String?
+  productCategories       String?
+  workingBrands           String[]         @default([])
+
+  // KVKK Consent Logs
+  kvkkApproved            Boolean          @default(false)
+  privacyPolicyApproved   Boolean          @default(false)
+  termsApproved           Boolean          @default(false)
+  marketingApproved       Boolean          @default(false)
+  approvalDate            DateTime?
+  ipAddress               String?
+
+  // Logo parameters
+  logoUrl                 String?
+  noLogo                  Boolean          @default(true)
+  logoType                String           @default("auto")
+
+  // Session tracking fields
+  activeSessionId         String?
+  lastLoginTime           DateTime?
+  lastLoginIp             String?
+  lastLoginDevice         String?
+
+  // Relations
+  invoices                Invoice[]
+  companies               Company[]        @relation("CompanyOwner")
+  products                Product[]        @relation("ProductSeller")
+  ordersAsBuyer           Order[]          @relation("BuyerOrders")
+  ordersAsSeller          Order[]          @relation("SellerOrders")
+  tickets                 SupportTicket[]  @relation("TicketCreator")
+  expertProfiles          ExpertProfile[]  @relation("ExpertUser")
+  payments                Payment[]
+  smsLogs                 SmsLog[]
+  emailLogs               EmailLog[]
+}
+
+model Invoice {
+  id             String   @id
+  userId         String
+  amount         Float
+  date           DateTime @default(now())
+  membershipType String
+  status         String   // "Ödendi" | "İade" | "İptal"
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Company {
+  id             String   @id @default(uuid())
+  companyName    String
+  city           String
+  district       String
+  address        String
+  phone          String
+  email          String
+  website        String?
+  description    String?
+  logo           String?
+  status         String   @default("Aktif")      // "Aktif" | "Pasif"
+  approvedStatus String   @default("Onay Bekliyor") // "Onaylandı" | "Onay Bekliyor" | "Reddedildi"
+  rating         Float    @default(5.0)
+  ownerId        String?
+  owner          User?    @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  reviews        Review[]
+}
+
+model Product {
+  id              String   @id @default(uuid())
+  name            String
+  description     String
+  price           Float
+  stock           Int      @default(1)
+  category        String
+  condition       String   // "Sıfır" | "2. El"
+  conditionDetail String   // "Sıfır" | "Çok İyi" | "İyi" | "Orta" | "Yıpranmış"
+  original        String   // "Evet" | "Hayır"
+  brand           String
+  city            String
+  district        String
+  images          String[] @default([])
+  sellerId        String
+  seller          User     @relation("ProductSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  status          String   @default("Onay Bekliyor") // "Onay Bekliyor" | "Yayında" | "Reddedildi" | "Satıldı" | "Pasif"
+  createdAt       DateTime @default(now())
+}
+
+model Order {
+  id          String   @id @default(uuid())
+  productId   String
+  productName String
+  buyerId     String
+  buyer       User     @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
+  buyerName   String
+  buyerPhone  String
+  buyerEmail  String
+  buyerRole   String
+  qty         Int      @default(1)
+  totalPrice  Float
+  status      String   @default("Onay Bekliyor") // "Onay Bekliyor" | "Onaylandı" | "Reddedildi" | "Satıldı"
+  sellerId    String
+  seller      User     @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Cascade)
+  sellerName  String
+  createdAt   DateTime @default(now())
+}
+
+model Article {
+  id                String    @id @default(uuid())
+  title             String
+  summary           String
+  category          String
+  date              DateTime  @default(now())
+  author            String
+  image             String?
+  tags              String[]  @default([])
+  likes             Int       @default(0)
+  views             Int       @default(0)
+  content           String    @db.Text
+  seoTitle          String?
+  seoDescription    String?
+  seoKeywords       String[]  @default([])
+  openGraphSupport  Boolean   @default(true)
+  googleNewsReady   Boolean   @default(true)
+  socialShareText   String?
+
+  // Required Audit & Lifecycle fields for Haberler tablosu
+  status            String    @default("Onay Bekliyor") // "Onay Bekliyor" | "Yayınlandı" | "Reddedildi"
+  published         Boolean   @default(false)
+  publishedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  authorId          String?
+  approvedBy        String?
+  approvedAt        DateTime?
+}
+
+model Bulletin {
+  id                     String   @id @default(uuid())
+  title                  String
+  summary                String
+  category               String
+  lpgBrand               String
+  date                   DateTime @default(now())
+  author                 String
+  authorTitle            String?
+  views                  Int      @default(0)
+  likes                  Int      @default(0)
+  tags                   String[] @default([])
+  content                String   @db.Text
+  targetMotor            String?
+  compatibilityStatus    String?
+  knownIssues            String?
+  recommendedKits        String[] @default([])
+  nozzleRecommendation   String?
+  regulatorRecommendation String?
+  calibrationNotes       String?  @db.Text
+  seoTitle               String?
+  seoDescription         String?
+  seoKeywords            String[] @default([])
+  openGraphSupport       Boolean  @default(true)
+  googleNewsReady        Boolean  @default(true)
+  socialShareText        String?
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   // "all" or specific User.id
+  title     String
+  message   String
+  type      String   // "teklif" | "mesaj" | "siparis" | "uyari" | "duyuru"
+  channel   String   // "sms" | "email" | "panel" | "all"
+  createdAt DateTime @default(now())
+  read      Boolean  @default(false)
+}
+
+model SmsLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  phone     String
+  message   String
+  sentAt    DateTime @default(now())
+  status    String   // "Gönderildi" | "Hata" | "Beklemede"
+  error     String?
+}
+
+model EmailLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email     String
+  subject   String
+  body      String   @db.Text
+  sentAt    DateTime @default(now())
+  status    String   // "Gönderildi" | "Hata" | "Beklemede"
+  error     String?
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount        Float
+  status        String   // "Başarılı" | "Başarısız" | "İade" | "İptal"
+  transactionId String?  @unique
+  method        String   @default("Kredi Kartı")
+  createdAt     DateTime @default(now())
+  couponCode    String?
+}
+
+model Coupon {
+  id         String    @id @default(uuid())
+  code       String    @unique
+  discount   Float     @default(500.0) // Fixed discount amount
+  expiry     DateTime?
+  maxUses    Int       @default(1)
+  usesCount  Int       @default(0)
+}
+
+model SupportTicket {
+  id           String   @id @default(uuid())
+  creatorId    String   // "guest" or specific User.id
+  creator      User?    @relation("TicketCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  creatorName  String
+  creatorPhone String
+  creatorEmail String
+  title        String
+  description  String   @db.Text
+  status       String   @default("Yeni Talep") // "Yeni Talep" | "İnceleniyor" | "Çözüm Gönderildi" | "Kullanıcı Onayladı" | "Tamamlandı" | "Kapatıldı"
+  createdAt    DateTime @default(now())
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userName  String
+  userRole  String
+  rating    Int      @default(5)
+  comment   String   @db.Text
+  createdAt DateTime @default(now())
+}
+
+model ExpertProfile {
+  id           String   @id @default(uuid())
+  name         String
+  expertise    String
+  experience   String
+  brands       String[] @default([])
+  city         String
+  about        String   @db.Text
+  certificates String[] @default([])
+  photo        String?
+  userId       String
+  user         User     @relation("ExpertUser", fields: [userId], references: [id], onDelete: Cascade)
+  status       String   @default("Aktif") // "Aktif" | "Pasif"
+  createdAt    DateTime @default(now())
+}
+
+model HomeReview {
+  id          String   @id @default(uuid())
+  userId      String
+  authorName  String
+  authorRole  String
+  profession  String?
+  city        String
+  carBrand    String?
+  carModel    String?
+  title       String
+  content     String   @db.Text
+  rating      Int      @default(5)
+  status      String   @default("Onay Bekliyor") // "Onay Bekliyor" | "Onaylandı" | "Reddedildi" | "Pasif"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

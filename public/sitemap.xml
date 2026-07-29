@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <!-- Ana Sayfa (Home) -->
+  <url>
+    <loc>https://www.lpgportal.com/</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/en" />
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/en</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/en" />
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- LPG Uyumluluk (LPG Compatibility) -->
+  <url>
+    <loc>https://www.lpgportal.com/lpg-uyumluluk</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/lpg-uyumluluk" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/lpg-compatibility" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/lpg-compatibility</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/lpg-uyumluluk" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/lpg-compatibility" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Teklif Al (Get Quote) -->
+  <url>
+    <loc>https://www.lpgportal.com/teklif-al</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/teklif-al" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/get-quote" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/get-quote</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/teklif-al" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/get-quote" />
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Firma Rehberi (Company Directory) -->
+  <url>
+    <loc>https://www.lpgportal.com/firma-rehberi</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/firma-rehberi" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/company-directory" />
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/company-directory</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/firma-rehberi" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/company-directory" />
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Market (Store) -->
+  <url>
+    <loc>https://www.lpgportal.com/market</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/market" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/store" />
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/store</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/market" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/store" />
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Haberler & Bültenler (News & Bulletins) -->
+  <url>
+    <loc>https://www.lpgportal.com/haberler-bultenler</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/haberler-bultenler" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/news-bulletins" />
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/news-bulletins</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/haberler-bultenler" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/news-bulletins" />
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- İlanlar / Eğitimler & Kariyer (Education & Careers) -->
+  <url>
+    <loc>https://www.lpgportal.com/egitimler-kariyer</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/egitimler-kariyer" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/education-careers" />
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/education-careers</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/egitimler-kariyer" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/education-careers" />
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- İletişim (Contact) -->
+  <url>
+    <loc>https://www.lpgportal.com/iletisim</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/iletisim" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/contact" />
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/contact</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/iletisim" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/contact" />
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <!-- Hakkımızda (About Us) -->
+  <url>
+    <loc>https://www.lpgportal.com/hakkimizda</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/hakkimizda" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/about" />
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/about</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/hakkimizda" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/about" />
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <!-- Destek Merkezi (Support Center) -->
+  <url>
+    <loc>https://www.lpgportal.com/destek-merkezi</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/destek-merkezi" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/support-center" />
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/support-center</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/destek-merkezi" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/support-center" />
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <!-- Üyelik / Giriş / Kayıt (Membership) -->
+  <url>
+    <loc>https://www.lpgportal.com/uyelik</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/uyelik" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/membership" />
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/membership</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/uyelik" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/membership" />
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <!-- Reklam (Advertising) -->
+  <url>
+    <loc>https://www.lpgportal.com/reklam-ve-isbirlikleri</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/reklam-ve-isbirlikleri" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/advertising-sponsorship" />
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/advertising-sponsorship</loc>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://www.lpgportal.com/reklam-ve-isbirlikleri" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lpgportal.com/advertising-sponsorship" />
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+
+  <!-- Legal Pages (KVKK, Gizlilik vb.) -->
+  <url>
+    <loc>https://www.lpgportal.com/kvkk</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/gizlilik-politikasi</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/kullanim-sartlari</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/cerez-politikasi</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.lpgportal.com/mesafeli-hizmet-sozlesmesi</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+</urlset>

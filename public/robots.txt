@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /membership
+Disallow: /login
+Disallow: /register
+Disallow: /payment
+
+Sitemap: https://www.lpgportal.com/sitemap.xml
