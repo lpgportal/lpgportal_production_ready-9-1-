@@ -277,11 +277,13 @@ async function initDatabase() {
     console.log("Successfully connected to PostgreSQL via Prisma Client.");
     useFallback = false;
 
-    // Seed default users if PostgreSQL is empty
+    // Seed default users if they are missing
     try {
-      const userCount = await prisma.user.count();
-      if (userCount === 0) {
-        console.log("PostgreSQL database is empty. Seeding default users...");
+      const adminExists = await prisma.user.findUnique({
+        where: { email: "admin@lpgportal.com" }
+      });
+      if (!adminExists) {
+        console.log("Admin user not found in PostgreSQL. Seeding default users...");
         let fallbackDb: any = {};
         try {
           fallbackDb = JSON.parse(fs.readFileSync(FALLBACK_DB_PATH, "utf8"));
@@ -301,6 +303,11 @@ async function initDatabase() {
         ];
 
         for (const u of defaultUsers) {
+          const exists = await prisma.user.findUnique({
+            where: { email: u.email }
+          });
+          if (exists) continue;
+
           const statusMap: any = {
             "Süresi Dolmuş": "SuresiDolmus",
             "Askıya Alındı": "AskiyaAlindi",
