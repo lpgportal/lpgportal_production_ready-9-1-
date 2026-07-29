@@ -1,8 +1,6 @@
 import express from "express";
 import os from "os";
-import localtunnel from "localtunnel";
 import { spawn } from "child_process";
-import { bin as cloudflaredBin } from "cloudflared";
 import path from "path";
 import dotenv from "dotenv";
 import fs from "fs";
@@ -2089,42 +2087,49 @@ async function startServer() {
       console.log(`  > Network: (No active network IP found)`);
     }
 
-    console.log(`  > Secure Tunneling: Initiating connection to the public web...`);
+    // Start Secure Tunneling ONLY in development mode
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`  > Secure Tunneling: Initiating connection to the public web...`);
 
-    // Start LocalTunnel
-    try {
-      const tunnel = await localtunnel({ port: PORT });
-      console.log(`  > Public (LocalTunnel):  ${tunnel.url}`);
-      (globalThis as any).localtunnelUrl = tunnel.url;
+      // Start LocalTunnel
+      try {
+        const localtunnelModule = await import("localtunnel");
+        const localtunnel = localtunnelModule.default;
+        const tunnel = await localtunnel({ port: PORT });
+        console.log(`  > Public (LocalTunnel):  ${tunnel.url}`);
+        (globalThis as any).localtunnelUrl = tunnel.url;
 
-      tunnel.on("error", (err) => {
-        console.error("Localtunnel error:", err);
-      });
-      tunnel.on("close", () => {
-        console.log("Localtunnel closed.");
-      });
-    } catch (e) {
-      console.log("  > Public (LocalTunnel):  Failed to start LocalTunnel");
-    }
+        tunnel.on("error", (err) => {
+          console.error("Localtunnel error:", err);
+        });
+        tunnel.on("close", () => {
+          console.log("Localtunnel closed.");
+        });
+      } catch (e) {
+        console.log("  > Public (LocalTunnel):  Failed to start LocalTunnel");
+      }
 
-    // Start Cloudflare Tunnel
-    try {
-      const cfTunnel = spawn(cloudflaredBin, ["tunnel", "--url", `http://localhost:${PORT}`]);
-      cfTunnel.stderr.on("data", (data) => {
-        const str = data.toString();
-        if (str.includes("trycloudflare.com")) {
-          const match = str.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
-          if (match) {
-            console.log(`  > Public (Cloudflare):   ${match[0]}\n`);
-            (globalThis as any).cloudflareUrl = match[0];
+      // Start Cloudflare Tunnel
+      try {
+        const cloudflaredModule = await import("cloudflared");
+        const cloudflaredBin = cloudflaredModule.bin;
+        const cfTunnel = spawn(cloudflaredBin, ["tunnel", "--url", `http://localhost:${PORT}`]);
+        cfTunnel.stderr.on("data", (data) => {
+          const str = data.toString();
+          if (str.includes("trycloudflare.com")) {
+            const match = str.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+            if (match) {
+              console.log(`  > Public (Cloudflare):   ${match[0]}\n`);
+              (globalThis as any).cloudflareUrl = match[0];
+            }
           }
-        }
-      });
-      cfTunnel.on("error", (err) => {
-        console.log("  > Public (Cloudflare):   Failed to spawn Cloudflare process", err);
-      });
-    } catch (e) {
-      console.log("  > Public (Cloudflare):   Failed to start Cloudflare Tunnel");
+        });
+        cfTunnel.on("error", (err) => {
+          console.log("  > Public (Cloudflare):   Failed to spawn Cloudflare process", err);
+        });
+      } catch (e) {
+        console.log("  > Public (Cloudflare):   Failed to start Cloudflare Tunnel");
+      }
     }
   });
 }
