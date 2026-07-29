@@ -276,6 +276,79 @@ async function initDatabase() {
     await prisma.$connect();
     console.log("Successfully connected to PostgreSQL via Prisma Client.");
     useFallback = false;
+
+    // Seed default users if PostgreSQL is empty
+    try {
+      const userCount = await prisma.user.count();
+      if (userCount === 0) {
+        console.log("PostgreSQL database is empty. Seeding default users...");
+        let fallbackDb: any = {};
+        try {
+          fallbackDb = JSON.parse(fs.readFileSync(FALLBACK_DB_PATH, "utf8"));
+        } catch (e) {
+          console.warn("Failed to read fallback_db.json for seeding:", e);
+        }
+        const defaultUsers = fallbackDb["lpgportal_users"] || [
+          {
+            id: "user_admin",
+            name: "Kerem Kar (Yönetici)",
+            email: "admin@lpgportal.com",
+            phone: "0555 999 8877",
+            password: hashPassword("Admin34.", "admin@lpgportal.com"),
+            role: "admin",
+            membership_status: "Aktif"
+          }
+        ];
+
+        for (const u of defaultUsers) {
+          const statusMap: any = {
+            "Süresi Dolmuş": "SuresiDolmus",
+            "Askıya Alındı": "AskiyaAlindi",
+            "Onay Bekliyor": "OnayBekliyor"
+          };
+          const dbStatus = statusMap[u.membership_status] || u.membership_status || "Aktif";
+          await prisma.user.create({
+            data: {
+              id: u.id,
+              name: u.name,
+              email: u.email,
+              phone: u.phone,
+              password: u.password,
+              role: u.role,
+              membershipType: u.membership_type || "Ziyaretçi",
+              membershipFee: Number(u.membership_fee || 0),
+              membershipStart: new Date(u.membership_start || Date.now()),
+              membershipEnd: new Date(u.membership_end || Date.now()),
+              membershipStatus: dbStatus,
+              companyName: u.company_name,
+              authorizedName: u.authorized_name,
+              taxInfo: u.tax_info,
+              website: u.website,
+              city: u.city,
+              district: u.district,
+              expertise: u.expertise,
+              brandName: u.brandName || u.brand_name,
+              authorizedPerson: u.authorizedPerson || u.authorized_person,
+              productCategories: u.productCategories || u.product_categories,
+              workingBrands: u.working_brands || [],
+              kvkkApproved: !!u.kvkk_approved,
+              privacyPolicyApproved: !!u.privacy_policy_approved,
+              termsApproved: !!u.terms_approved,
+              marketingApproved: !!u.marketing_approved,
+              logoUrl: u.logo_url,
+              noLogo: !!u.no_logo,
+              logoType: u.logo_type || "auto",
+              activeSessionId: u.active_session_id,
+              lastLoginIp: u.last_login_ip,
+              lastLoginDevice: u.last_login_device
+            }
+          });
+        }
+        console.log("PostgreSQL default users seeded successfully.");
+      }
+    } catch (seedErr) {
+      console.error("Failed to check/seed PostgreSQL users:", seedErr);
+    }
   } catch (err) {
     if (process.env.NODE_ENV === "production") {
       console.error("CRITICAL ERROR: PostgreSQL connection failed! JSON fallback database is DISABLED in production mode!", err);
