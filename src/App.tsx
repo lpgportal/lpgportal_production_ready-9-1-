@@ -292,7 +292,8 @@ export default function App() {
       "/giris": "giris",
       "/kayit": "giris",
       "/hakkimizda": "about",
-      "/reklam-ve-isbirlikleri": "advertising"
+      "/reklam-ve-isbirlikleri": "advertising",
+      "/bildirim-merkezi": "giris"
     };
 
     const enPathMapping: Record<string, string> = {
@@ -310,7 +311,8 @@ export default function App() {
       "/login": "giris",
       "/register": "giris",
       "/about": "about",
-      "/advertising-sponsorship": "advertising"
+      "/advertising-sponsorship": "advertising",
+      "/notifications": "giris"
     };
 
     return trPathMapping[pathname] || enPathMapping[pathname] || "dashboard";
@@ -913,7 +915,8 @@ export default function App() {
       "/giris": "giris",
       "/kayit": "giris",
       "/hakkimizda": "about",
-      "/reklam-ve-isbirlikleri": "advertising"
+      "/reklam-ve-isbirlikleri": "advertising",
+      "/bildirim-merkezi": "giris"
     };
 
     const enPathMapping: Record<string, string> = {
@@ -931,7 +934,8 @@ export default function App() {
       "/login": "giris",
       "/register": "giris",
       "/about": "about",
-      "/advertising-sponsorship": "advertising"
+      "/advertising-sponsorship": "advertising",
+      "/notifications": "giris"
     };
 
     if (trPathMapping[pathname]) {
