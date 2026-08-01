@@ -219,6 +219,16 @@ export default function MembershipPortal({
 
   const [userMainTab, setUserMainTab] = useState<"profile" | "notifications" | "quotes" | "market_management" | "feedback" | null>(() => {
     const saved = localStorage.getItem("lpgportal_user_main_tab");
+    const activeUserRaw = localStorage.getItem("lpgportal_active_user");
+    let activeUserObj = null;
+    try {
+      if (activeUserRaw) activeUserObj = JSON.parse(activeUserRaw);
+    } catch(e) {}
+    
+    const isAdmin = activeUserObj?.role === "admin";
+    if (saved === "notifications" && !isAdmin) {
+      return "profile";
+    }
     return (saved === "profile" || saved === "notifications" || saved === "quotes" || saved === "market_management" || saved === "feedback") ? (saved as any) : "profile";
   });
 
@@ -235,8 +245,24 @@ export default function MembershipPortal({
         setUserMainTab(null);
       } else {
         const saved = localStorage.getItem("lpgportal_user_main_tab") as any;
-        setUserMainTab(saved && saved !== "null" ? saved : "profile");
+        setUserMainTab(saved && saved !== "null" && saved !== "notifications" ? saved : "profile");
         setAdminTab(null);
+      }
+    }
+  }, [activeUser]);
+
+  useEffect(() => {
+    const pathname = window.location.pathname;
+    if (pathname === "/notifications" || pathname === "/bildirim-merkezi" || window.location.search.includes("tab=notifications")) {
+      if (activeUser) {
+        if (activeUser.role === "admin") {
+          setUserMainTab("notifications");
+          setAdminTab(null);
+        } else {
+          alert("Yetkisiz Erişim (403): Bu sayfaya yalnızca yöneticiler erişebilir.");
+          setUserMainTab("profile");
+          window.history.pushState({}, "", "/uyelik");
+        }
       }
     }
   }, [activeUser]);
@@ -5901,28 +5927,30 @@ export default function MembershipPortal({
                     Tekliflerim
                   </button>
                 )}
-                <button 
-                  onClick={() => { setUserMainTab("notifications"); setAdminTab(null); }}
-                  className={`w-full text-left font-bold text-xs py-2 px-3 rounded-lg flex items-center justify-between cursor-pointer transition-all ${
-                    userMainTab === "notifications" 
-                      ? "bg-emerald-50 text-emerald-800 font-extrabold" 
-                      : "bg-transparent text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-4 w-4 text-amber-500 animate-bounce" />
-                    <span>Bildirim Merkezi</span>
-                  </div>
-                  {(() => {
-                    const userNotifs = notificationsList.filter(n => n.userId === "all" || (activeUser && n.userId === activeUser.id));
-                    const unread = userNotifs.filter(n => !n.read).length;
-                    return unread > 0 ? (
-                      <span className="h-4 min-w-[16px] px-1 bg-rose-600 text-white font-mono font-black rounded-full text-[9px] flex items-center justify-center animate-pulse shadow-xs">
-                        {unread}
-                      </span>
-                    ) : null;
-                  })()}
-                </button>
+                {activeUser?.role === "admin" && (
+                  <button 
+                    onClick={() => { setUserMainTab("notifications"); setAdminTab(null); }}
+                    className={`w-full text-left font-bold text-xs py-2 px-3 rounded-lg flex items-center justify-between cursor-pointer transition-all ${
+                      userMainTab === "notifications" 
+                        ? "bg-emerald-50 text-emerald-800 font-extrabold" 
+                        : "bg-transparent text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Bell className="h-4 w-4 text-amber-500 animate-bounce" />
+                      <span>Bildirim Merkezi</span>
+                    </div>
+                    {(() => {
+                      const userNotifs = notificationsList.filter(n => n.userId === "all" || (activeUser && n.userId === activeUser.id));
+                      const unread = userNotifs.filter(n => !n.read).length;
+                      return unread > 0 ? (
+                        <span className="h-4 min-w-[16px] px-1 bg-rose-600 text-white font-mono font-black rounded-full text-[9px] flex items-center justify-center animate-pulse shadow-xs">
+                          {unread}
+                        </span>
+                      ) : null;
+                    })()}
+                  </button>
+                )}
                 <button 
                   onClick={() => { setUserMainTab("market_management"); setAdminTab(null); }}
                   className={`w-full text-left font-bold text-xs py-2 px-3 rounded-lg flex items-center gap-2 cursor-pointer transition-all ${
@@ -13116,7 +13144,8 @@ export default function MembershipPortal({
               </div>
 
               {/* Dynamic Simulator Controls */}
-              <div className="bg-gradient-to-tr from-emerald-50 to-teal-50/50 p-6 rounded-3xl border border-emerald-150/80 space-y-4">
+              {activeUser?.role === "admin" && (
+                <div className="bg-gradient-to-tr from-emerald-50 to-teal-50/50 p-6 rounded-3xl border border-emerald-150/80 space-y-4">
                 <div className="flex items-center gap-2 border-b border-emerald-100 pb-2">
                   <span className="text-lg">🛠️</span>
                   <div>
@@ -13487,6 +13516,7 @@ export default function MembershipPortal({
                   </button>
                 </div>
               </div>
+            )}
 
               {/* Notifications List Card */}
               <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm animate-fade-in text-xs">
