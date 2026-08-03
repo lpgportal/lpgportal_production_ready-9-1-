@@ -1,8 +1,11 @@
+import { lpgportalStorage as localStorage } from '@/src/lib/storage';
 import React, { useState } from "react";
 import { VEHICLES_DATA, CAR_BRANDS, getVehiclesDb } from "../data";
 import { Vehicle } from "../types";
 import { Sparkles, CheckCircle2, ArrowRight } from "lucide-react";
 import { useLanguage } from "../lib/LanguageContext";
+
+
 
 interface CompatibilityProps {
   onPrepopulateQuote: (brand: string, model: string, year: string, engine: string) => void;
