@@ -1871,11 +1871,6 @@ app.get("/api/db/get-all", async (req, res) => {
     const articles = await prisma.article.findMany();
     const bulletins = await prisma.bulletin.findMany();
     const notifications = await prisma.notification.findMany();
-    const smsLogs = await prisma.smsLog.findMany();
-    const emailLogs = await prisma.emailLog.findMany();
-    const payments = await prisma.payment.findMany();
-    const coupons = await prisma.coupon.findMany();
-    const supportTickets = await prisma.supportTicket.findMany();
     const expertProfiles = await prisma.expertProfile.findMany();
     const homeReviews = await prisma.homeReview.findMany();
 
@@ -1918,10 +1913,201 @@ app.get("/api/db/get-all", async (req, res) => {
       last_login_device: u.lastLoginDevice
     }));
 
+    const mappedInvoices = invoices.map(i => ({
+      id: i.id,
+      userId: i.userId,
+      amount: i.amount,
+      date: i.date.toISOString(),
+      membership_type: i.membershipType,
+      status: i.status,
+      payment_method: i.paymentMethod || undefined,
+      admin_note: i.adminNote || undefined,
+      userName: i.userName || undefined,
+      companyName: i.companyName || undefined,
+      roleDisplayName: i.roleDisplayName || undefined,
+      packageName: i.packageName || undefined,
+      dekont_status: i.dekontStatus || undefined,
+      dekont_url: i.dekontUrl || undefined
+    }));
+
+    const mappedCompanies = companies.map(c => ({
+      id: c.id,
+      companyName: c.companyName,
+      city: c.city,
+      district: c.district,
+      address: c.address,
+      phone: c.phone,
+      email: c.email,
+      website: c.website || undefined,
+      description: c.description || undefined,
+      logo: c.logo || undefined,
+      status: c.status,
+      approvedStatus: c.approvedStatus,
+      rating: c.rating,
+      ownerId: c.ownerId || undefined
+    }));
+
+    const mappedProducts = products.map(p => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      price: p.price,
+      stock: p.stock,
+      category: p.category,
+      condition: p.condition,
+      conditionDetail: p.conditionDetail,
+      original: p.original,
+      brand: p.brand,
+      city: p.city,
+      district: p.district,
+      images: p.images,
+      sellerId: p.sellerId,
+      status: p.status,
+      createdAt: p.createdAt.toISOString()
+    }));
+
+    const mappedOrders = orders.map(o => ({
+      id: o.id,
+      productId: o.productId,
+      productName: o.productName,
+      buyerId: o.buyerId,
+      buyerName: o.buyerName,
+      buyerPhone: o.buyerPhone,
+      buyerEmail: o.buyerEmail,
+      buyerRole: o.buyerRole,
+      qty: o.qty,
+      totalPrice: o.totalPrice,
+      status: o.status,
+      sellerId: o.sellerId,
+      sellerName: o.sellerName,
+      createdAt: o.createdAt.toISOString()
+    }));
+
+    const mappedNews = articles.filter(a => a.articleType === "news").map(a => ({
+      id: a.id,
+      title: a.title,
+      summary: a.summary,
+      category: a.category,
+      date: a.date.toISOString(),
+      author: a.author,
+      image: a.image || undefined,
+      tags: a.tags,
+      likes: a.likes,
+      views: a.views,
+      content: a.content,
+      seoTitle: a.seoTitle || undefined,
+      seoDescription: a.seoDescription || undefined,
+      seoKeywords: a.seoKeywords,
+      openGraphSupport: a.openGraphSupport,
+      googleNewsReady: a.googleNewsReady,
+      socialShareText: a.socialShareText || undefined,
+      status: a.status,
+      published: a.published,
+      publishedAt: a.publishedAt?.toISOString(),
+      createdAt: a.createdAt.toISOString(),
+      updatedAt: a.updatedAt.toISOString(),
+      authorId: a.authorId || undefined,
+      approvedBy: a.approvedBy || undefined,
+      approvedAt: a.approvedAt?.toISOString()
+    }));
+
+    const mappedUserContents = articles.filter(a => a.articleType === "user_content").map(a => ({
+      id: a.id,
+      title: a.title,
+      summary: a.summary,
+      category: a.category,
+      date: a.date.toISOString(),
+      author: a.author,
+      image: a.image || undefined,
+      tags: a.tags,
+      likes: a.likes,
+      views: a.views,
+      content: a.content,
+      seoTitle: a.seoTitle || undefined,
+      seoDescription: a.seoDescription || undefined,
+      seoKeywords: a.seoKeywords,
+      openGraphSupport: a.openGraphSupport,
+      googleNewsReady: a.googleNewsReady,
+      socialShareText: a.socialShareText || undefined,
+      status: a.status,
+      published: a.published,
+      publishedAt: a.publishedAt?.toISOString(),
+      createdAt: a.createdAt.toISOString(),
+      updatedAt: a.updatedAt.toISOString(),
+      authorId: a.authorId || undefined,
+      approvedBy: a.approvedBy || undefined,
+      approvedAt: a.approvedAt?.toISOString()
+    }));
+
+    const mappedBulletins = bulletins.map(b => ({
+      id: b.id,
+      title: b.title,
+      summary: b.summary,
+      category: b.category,
+      lpgBrand: b.lpgBrand,
+      date: b.date.toISOString(),
+      author: b.author,
+      authorTitle: b.authorTitle || undefined,
+      views: b.views,
+      likes: b.likes,
+      tags: b.tags,
+      content: b.content,
+      targetMotor: b.targetMotor || undefined,
+      compatibilityStatus: b.compatibilityStatus || undefined,
+      knownIssues: b.knownIssues || undefined,
+      recommendedKits: b.recommendedKits,
+      nozzleRecommendation: b.nozzleRecommendation || undefined,
+      regulatorRecommendation: b.regulatorRecommendation || undefined,
+      calibrationNotes: b.calibrationNotes || undefined,
+      seoTitle: b.seoTitle || undefined,
+      seoDescription: b.seoDescription || undefined,
+      seoKeywords: b.seoKeywords,
+      openGraphSupport: b.openGraphSupport,
+      googleNewsReady: b.googleNewsReady,
+      socialShareText: b.socialShareText || undefined
+    }));
+
+    const mappedNotifications = notifications.map(n => ({
+      id: n.id,
+      userId: n.userId,
+      title: n.title,
+      message: n.message,
+      type: n.type,
+      channel: n.channel,
+      createdAt: n.createdAt.toISOString(),
+      read: n.read
+    }));
+
+    const mappedHomeReviews = homeReviews.map(h => ({
+      id: h.id,
+      userId: h.userId,
+      authorName: h.authorName,
+      authorRole: h.authorRole,
+      profession: h.profession || undefined,
+      city: h.city,
+      carBrand: h.carBrand || undefined,
+      carModel: h.carModel || undefined,
+      title: h.title,
+      content: h.content,
+      rating: h.rating,
+      status: h.status,
+      createdAt: h.createdAt.toISOString(),
+      updatedAt: h.updatedAt.toISOString()
+    }));
+
     const fallbackDb = readFallbackDb();
     const fullDb = {
       ...fallbackDb,
-      lpgportal_users: mappedUsers
+      lpgportal_users: mappedUsers,
+      lpgportal_invoices: mappedInvoices,
+      lpgportal_companies: mappedCompanies,
+      lpgportal_products: mappedProducts,
+      lpgportal_orders: mappedOrders,
+      lpgportal_news_db: mappedNews,
+      lpgportal_user_contents_db: mappedUserContents,
+      lpgportal_bulletins_db: mappedBulletins,
+      lpgportal_central_notifications: mappedNotifications,
+      lpgportal_home_reviews: mappedHomeReviews
     };
 
     return res.json(fullDb);
@@ -1954,156 +2140,656 @@ app.post("/api/db/save", async (req, res) => {
       if (process.env.NODE_ENV === "production") {
         return res.status(500).json({ error: "Veritabanı bağlantısı kurulamadı. Lütfen daha sonra tekrar deneyiniz." });
       }
-      if (key === "lpgportal_users" && Array.isArray(translatedVal)) {
-        const normalizePhone = (phone: string): string => {
-          const digits = (phone || "").replace(/\D/g, "");
-          return digits.slice(-10);
-        };
-
-        const existingDb = readFallbackDb();
-        const existingUsers = existingDb["lpgportal_users"] || [];
-        for (const u of translatedVal) {
-          const normPhone = normalizePhone(u.phone);
-          const emailMatch = existingUsers.find((x: any) => x.id !== u.id && x.email.toLowerCase().trim() === u.email.toLowerCase().trim());
-          if (emailMatch) {
-            return res.status(400).json({ error: "Bu e-posta adresi ile kayıtlı bir kullanıcı bulunmaktadır." });
-          }
-          if (!normPhone) continue;
-          const phoneMatch = existingUsers.find((x: any) => x.id !== u.id && normalizePhone(x.phone) === normPhone);
-          if (phoneMatch) {
-            return res.status(400).json({ error: "Bu telefon numarası ile kayıtlı bir kullanıcı bulunmaktadır." });
-          }
-        }
-      }
       const db = readFallbackDb();
       db[key] = translatedVal;
       writeFallbackDb(db);
       return res.json({ success: true, mode: "fallback", translatedValue: translatedVal });
     }
 
-    if (key === "lpgportal_users" && Array.isArray(translatedVal)) {
-      const normalizePhone = (phone: string): string => {
-        const digits = (phone || "").replace(/\D/g, "");
-        return digits.slice(-10);
-      };
-
-      // Backend validation: check for duplicates in Postgres mode
-      for (const u of translatedVal) {
-        const emailDuplicate = await prisma.user.findFirst({
-          where: {
-            email: { equals: u.email, mode: 'insensitive' },
-            id: { not: u.id }
-          }
-        });
-        if (emailDuplicate) {
-          return res.status(400).json({ error: "Bu e-posta adresi ile kayıtlı bir kullanıcı bulunmaktadır." });
-        }
-
-        const normPhone = normalizePhone(u.phone);
-        if (normPhone) {
-          const allDbUsers = await prisma.user.findMany({
-            where: { id: { not: u.id } }
-          });
-          const phoneDuplicate = allDbUsers.find(x => normalizePhone(x.phone) === normPhone);
-          if (phoneDuplicate) {
-            return res.status(400).json({ error: "Bu telefon numarası ile kayıtlı bir kullanıcı bulunmaktadır." });
-          }
-        }
-      }
-
-      // Prune users that are deleted in frontend (non-admin to prevent accidents)
-      const userIds = translatedVal.map(u => u.id);
-      await prisma.user.deleteMany({
-        where: {
-          id: { notIn: userIds },
-          role: { not: "admin" }
-        }
-      });
-
-      for (const u of translatedVal) {
-        const statusMap: any = {
-          "Süresi Dolmuş": "SuresiDolmus",
-          "Askıya Alındı": "AskiyaAlindi",
-          "Onay Bekliyor": "OnayBekliyor"
+    // Run all database operations inside a single Transaction
+    await prisma.$transaction(async (tx) => {
+      // 1. lpgportal_users
+      if (key === "lpgportal_users" && Array.isArray(translatedVal)) {
+        const normalizePhone = (phone: string): string => {
+          const digits = (phone || "").replace(/\D/g, "");
+          return digits.slice(-10);
         };
-        const dbStatus = statusMap[u.membership_status] || u.membership_status;
-        await prisma.user.upsert({
-          where: { email: u.email },
-          update: {
-            name: u.name,
-            phone: u.phone,
-            password: u.password,
-            role: u.role,
-            membershipType: u.membership_type || "Ziyaretçi",
-            membershipFee: Number(u.membership_fee || 0),
-            membershipStart: new Date(u.membership_start || Date.now()),
-            membershipEnd: new Date(u.membership_end || Date.now()),
-            membershipStatus: dbStatus,
-            companyName: u.company_name,
-            authorizedName: u.authorized_name,
-            taxInfo: u.tax_info,
-            website: u.website,
-            city: u.city,
-            district: u.district,
-            expertise: u.expertise,
-            brandName: u.brandName,
-            authorizedPerson: u.authorizedPerson,
-            productCategories: u.productCategories,
-            workingBrands: u.working_brands || [],
-            kvkkApproved: !!u.kvkk_approved,
-            privacyPolicyApproved: !!u.privacy_policy_approved,
-            termsApproved: !!u.terms_approved,
-            marketingApproved: !!u.marketing_approved,
-            approvalDate: u.approval_date ? new Date(u.approval_date) : null,
-            ipAddress: u.ip_address,
-            logoUrl: u.logo_url,
-            noLogo: !!u.no_logo,
-            logoType: u.logo_type || "auto",
-            activeSessionId: u.active_session_id,
-            lastLoginTime: u.last_login_time ? new Date(u.last_login_time) : null,
-            lastLoginIp: u.last_login_ip,
-            lastLoginDevice: u.last_login_device
-          },
-          create: {
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            phone: u.phone,
-            password: u.password || "",
-            role: u.role,
-            membershipType: u.membership_type || "Ziyaretçi",
-            membershipFee: Number(u.membership_fee || 0),
-            membershipStart: new Date(u.membership_start || Date.now()),
-            membershipEnd: new Date(u.membership_end || Date.now()),
-            membershipStatus: dbStatus,
-            companyName: u.company_name,
-            authorizedName: u.authorized_name,
-            taxInfo: u.tax_info,
-            website: u.website,
-            city: u.city,
-            district: u.district,
-            expertise: u.expertise,
-            brandName: u.brandName,
-            authorizedPerson: u.authorizedPerson,
-            productCategories: u.productCategories,
-            workingBrands: u.working_brands || [],
-            kvkkApproved: !!u.kvkk_approved,
-            privacyPolicyApproved: !!u.privacy_policy_approved,
-            termsApproved: !!u.terms_approved,
-            marketingApproved: !!u.marketing_approved,
-            approvalDate: u.approval_date ? new Date(u.approval_date) : null,
-            ipAddress: u.ip_address,
-            logoUrl: u.logo_url,
-            noLogo: !!u.no_logo,
-            logoType: u.logo_type || "auto",
-            activeSessionId: u.active_session_id,
-            lastLoginTime: u.last_login_time ? new Date(u.last_login_time) : null,
-            lastLoginIp: u.last_login_ip,
-            lastLoginDevice: u.last_login_device
+
+        // Validate duplicates
+        for (const u of translatedVal) {
+          const emailDuplicate = await tx.user.findFirst({
+            where: {
+              email: { equals: u.email, mode: 'insensitive' },
+              id: { not: u.id }
+            }
+          });
+          if (emailDuplicate) {
+            throw new Error("Bu e-posta adresi ile kayıtlı bir kullanıcı bulunmaktadır.");
+          }
+
+          const normPhone = normalizePhone(u.phone);
+          if (normPhone) {
+            const allDbUsers = await tx.user.findMany({
+              where: { id: { not: u.id } }
+            });
+            const phoneDuplicate = allDbUsers.find(x => normalizePhone(x.phone) === normPhone);
+            if (phoneDuplicate) {
+              throw new Error("Bu telefon numarası ile kayıtlı bir kullanıcı bulunmaktadır.");
+            }
+          }
+        }
+
+        // Upsert users
+        for (const u of translatedVal) {
+          const statusMap: any = {
+            "Süresi Dolmuş": "SuresiDolmus",
+            "Askıya Alındı": "AskiyaAlindi",
+            "Onay Bekliyor": "OnayBekliyor"
+          };
+          const dbStatus = statusMap[u.membership_status] || u.membership_status;
+          await tx.user.upsert({
+            where: { email: u.email },
+            update: {
+              name: u.name,
+              phone: u.phone,
+              password: u.password,
+              role: u.role,
+              membershipType: u.membership_type || "Ziyaretçi",
+              membershipFee: Number(u.membership_fee || 0),
+              membershipStart: new Date(u.membership_start || Date.now()),
+              membershipEnd: new Date(u.membership_end || Date.now()),
+              membershipStatus: dbStatus,
+              companyName: u.company_name,
+              authorizedName: u.authorized_name,
+              taxInfo: u.tax_info,
+              website: u.website,
+              city: u.city,
+              district: u.district,
+              expertise: u.expertise,
+              brandName: u.brandName,
+              authorizedPerson: u.authorizedPerson,
+              productCategories: u.product_categories,
+              workingBrands: u.working_brands || [],
+              kvkkApproved: !!u.kvkk_approved,
+              privacyPolicyApproved: !!u.privacy_policy_approved,
+              termsApproved: !!u.terms_approved,
+              marketingApproved: !!u.marketing_approved,
+              approvalDate: u.approval_date ? new Date(u.approval_date) : null,
+              ipAddress: u.ip_address,
+              logoUrl: u.logo_url,
+              noLogo: !!u.no_logo,
+              logoType: u.logo_type || "auto",
+              activeSessionId: u.active_session_id,
+              lastLoginTime: u.last_login_time ? new Date(u.last_login_time) : null,
+              lastLoginIp: u.last_login_ip,
+              lastLoginDevice: u.last_login_device
+            },
+            create: {
+              id: u.id,
+              name: u.name,
+              email: u.email,
+              phone: u.phone,
+              password: u.password || "",
+              role: u.role,
+              membershipType: u.membership_type || "Ziyaretçi",
+              membershipFee: Number(u.membership_fee || 0),
+              membershipStart: new Date(u.membership_start || Date.now()),
+              membershipEnd: new Date(u.membership_end || Date.now()),
+              membershipStatus: dbStatus,
+              companyName: u.company_name,
+              authorizedName: u.authorized_name,
+              taxInfo: u.tax_info,
+              website: u.website,
+              city: u.city,
+              district: u.district,
+              expertise: u.expertise,
+              brandName: u.brandName,
+              authorizedPerson: u.authorizedPerson,
+              productCategories: u.product_categories,
+              workingBrands: u.working_brands || [],
+              kvkkApproved: !!u.kvkk_approved,
+              privacyPolicyApproved: !!u.privacy_policy_approved,
+              termsApproved: !!u.terms_approved,
+              marketingApproved: !!u.marketing_approved,
+              approvalDate: u.approval_date ? new Date(u.approval_date) : null,
+              ipAddress: u.ip_address,
+              logoUrl: u.logo_url,
+              noLogo: !!u.no_logo,
+              logoType: u.logo_type || "auto",
+              activeSessionId: u.active_session_id,
+              lastLoginTime: u.last_login_time ? new Date(u.last_login_time) : null,
+              lastLoginIp: u.last_login_ip,
+              lastLoginDevice: u.last_login_device
+            }
+          });
+        }
+
+        // Targeted delete users not present in the incoming array (protecting admins)
+        const incomingIds = translatedVal.map((x: any) => x.id);
+        const existingUsers = await tx.user.findMany({ select: { id: true, role: true, email: true } });
+        const existingIds = existingUsers.filter(u => u.role !== "admin").map(u => u.id);
+        const toDelete = existingIds.filter(id => !incomingIds.includes(id));
+        if (incomingIds.length > 2) {
+          for (const id of toDelete) {
+            const userObj = existingUsers.find(x => x.id === id);
+            await tx.user.delete({ where: { id } });
+            await tx.auditLog.create({
+              data: {
+                actor: "API Sync",
+                action: "USER_DELETE",
+                details: `Deleted user ${userObj ? userObj.email : id}`,
+                ipAddress: req.ip
+              }
+            });
+          }
+        }
+
+        // Audit Log for Upsert
+        await tx.auditLog.create({
+          data: {
+            actor: "API Sync",
+            action: "USER_UPSERT_BATCH",
+            details: `Upserted batch of ${translatedVal.length} users`,
+            ipAddress: req.ip
           }
         });
       }
-    }
+
+      // 2. lpgportal_invoices
+      if (key === "lpgportal_invoices" && Array.isArray(translatedVal)) {
+        for (const inv of translatedVal) {
+          await tx.invoice.upsert({
+            where: { id: inv.id },
+            update: {
+              userId: inv.userId,
+              amount: Number(inv.amount),
+              date: new Date(inv.date || Date.now()),
+              membershipType: inv.membership_type,
+              status: inv.status,
+              paymentMethod: inv.payment_method || null,
+              adminNote: inv.admin_note || null,
+              userName: inv.userName || null,
+              companyName: inv.companyName || null,
+              roleDisplayName: inv.roleDisplayName || null,
+              packageName: inv.packageName || null,
+              dekontStatus: inv.dekont_status || null,
+              dekontUrl: inv.dekont_url || null
+            },
+            create: {
+              id: inv.id,
+              userId: inv.userId,
+              amount: Number(inv.amount),
+              date: new Date(inv.date || Date.now()),
+              membershipType: inv.membership_type,
+              status: inv.status,
+              paymentMethod: inv.payment_method || null,
+              adminNote: inv.admin_note || null,
+              userName: inv.userName || null,
+              companyName: inv.companyName || null,
+              roleDisplayName: inv.roleDisplayName || null,
+              packageName: inv.packageName || null,
+              dekontStatus: inv.dekont_status || null,
+              dekontUrl: inv.dekont_url || null
+            }
+          });
+        }
+
+        const incomingIds = translatedVal.map((x: any) => x.id);
+        const existingItems = await tx.invoice.findMany({ select: { id: true } });
+        const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
+        if (incomingIds.length > 0) {
+          for (const id of toDelete) {
+            await tx.invoice.delete({ where: { id } });
+            await tx.auditLog.create({
+              data: {
+                actor: "API Sync",
+                action: "INVOICE_DELETE",
+                details: `Deleted invoice ${id}`,
+                ipAddress: req.ip
+              }
+            });
+          }
+        }
+      }
+
+      // 3. lpgportal_companies
+      if (key === "lpgportal_companies" && Array.isArray(translatedVal)) {
+        for (const c of translatedVal) {
+          await tx.company.upsert({
+            where: { id: c.id },
+            update: {
+              companyName: c.companyName || c.company_name || "",
+              city: c.city || "",
+              district: c.district || "",
+              address: c.address || "",
+              phone: c.phone || "",
+              email: c.email || "",
+              website: c.website || null,
+              description: c.description || null,
+              logo: c.logo || null,
+              status: c.status || "Aktif",
+              approvedStatus: c.approvedStatus || c.approved_status || "Onay Bekliyor",
+              rating: Number(c.rating || 5.0),
+              ownerId: c.ownerId || null
+            },
+            create: {
+              id: c.id,
+              companyName: c.companyName || c.company_name || "",
+              city: c.city || "",
+              district: c.district || "",
+              address: c.address || "",
+              phone: c.phone || "",
+              email: c.email || "",
+              website: c.website || null,
+              description: c.description || null,
+              logo: c.logo || null,
+              status: c.status || "Aktif",
+              approvedStatus: c.approvedStatus || c.approved_status || "Onay Bekliyor",
+              rating: Number(c.rating || 5.0),
+              ownerId: c.ownerId || null
+            }
+          });
+        }
+
+        const incomingIds = translatedVal.map((x: any) => x.id);
+        const existingItems = await tx.company.findMany({ select: { id: true, companyName: true } });
+        const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
+        if (incomingIds.length > 0) {
+          for (const id of toDelete) {
+            const comp = existingItems.find(x => x.id === id);
+            await tx.company.delete({ where: { id } });
+            await tx.auditLog.create({
+              data: {
+                actor: "API Sync",
+                action: "COMPANY_DELETE",
+                details: `Deleted company ${comp ? comp.companyName : id}`,
+                ipAddress: req.ip
+              }
+            });
+          }
+        }
+      }
+
+      // 4. lpgportal_products
+      if (key === "lpgportal_products" && Array.isArray(translatedVal)) {
+        for (const p of translatedVal) {
+          await tx.product.upsert({
+            where: { id: p.id },
+            update: {
+              name: p.name || "",
+              description: p.description || "",
+              price: Number(p.price || 0),
+              stock: Number(p.stock || 1),
+              category: p.category || "",
+              condition: p.condition || "Sıfır",
+              conditionDetail: p.conditionDetail || p.condition_detail || "Sıfır",
+              original: p.original || "Evet",
+              brand: p.brand || "",
+              city: p.city || "",
+              district: p.district || "",
+              images: p.images || [],
+              sellerId: p.sellerId || "",
+              status: p.status || "Onay Bekliyor"
+            },
+            create: {
+              id: p.id,
+              name: p.name || "",
+              description: p.description || "",
+              price: Number(p.price || 0),
+              stock: Number(p.stock || 1),
+              category: p.category || "",
+              condition: p.condition || "Sıfır",
+              conditionDetail: p.conditionDetail || p.condition_detail || "Sıfır",
+              original: p.original || "Evet",
+              brand: p.brand || "",
+              city: p.city || "",
+              district: p.district || "",
+              images: p.images || [],
+              sellerId: p.sellerId || "",
+              status: p.status || "Onay Bekliyor"
+            }
+          });
+        }
+
+        const incomingIds = translatedVal.map((x: any) => x.id);
+        const existingItems = await tx.product.findMany({ select: { id: true, name: true } });
+        const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
+        if (incomingIds.length > 0) {
+          for (const id of toDelete) {
+            const prod = existingItems.find(x => x.id === id);
+            await tx.product.delete({ where: { id } });
+            await tx.auditLog.create({
+              data: {
+                actor: "API Sync",
+                action: "PRODUCT_DELETE",
+                details: `Deleted product ${prod ? prod.name : id}`,
+                ipAddress: req.ip
+              }
+            });
+          }
+        }
+      }
+
+      // 5. lpgportal_orders
+      if (key === "lpgportal_orders" && Array.isArray(translatedVal)) {
+        for (const o of translatedVal) {
+          await tx.order.upsert({
+            where: { id: o.id },
+            update: {
+              productId: o.productId,
+              productName: o.productName,
+              buyerId: o.buyerId,
+              buyerName: o.buyerName,
+              buyerPhone: o.buyerPhone,
+              buyerEmail: o.buyerEmail,
+              buyerRole: o.buyerRole,
+              qty: Number(o.qty || 1),
+              totalPrice: Number(o.totalPrice || 0),
+              status: o.status || "Onay Bekliyor",
+              sellerId: o.sellerId,
+              sellerName: o.sellerName
+            },
+            create: {
+              id: o.id,
+              productId: o.productId,
+              productName: o.productName,
+              buyerId: o.buyerId,
+              buyerName: o.buyerName,
+              buyerPhone: o.buyerPhone,
+              buyerEmail: o.buyerEmail,
+              buyerRole: o.buyerRole,
+              qty: Number(o.qty || 1),
+              totalPrice: Number(o.totalPrice || 0),
+              status: o.status || "Onay Bekliyor",
+              sellerId: o.sellerId,
+              sellerName: o.sellerName
+            }
+          });
+        }
+
+        const incomingIds = translatedVal.map((x: any) => x.id);
+        const existingItems = await tx.order.findMany({ select: { id: true } });
+        const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
+        if (incomingIds.length > 0) {
+          for (const id of toDelete) {
+            await tx.order.delete({ where: { id } });
+            await tx.auditLog.create({
+              data: {
+                actor: "API Sync",
+                action: "ORDER_DELETE",
+                details: `Deleted order ${id}`,
+                ipAddress: req.ip
+              }
+            });
+          }
+        }
+      }
+
+      // 6. lpgportal_news_db & lpgportal_user_contents_db
+      if ((key === "lpgportal_news_db" || key === "lpgportal_user_contents_db") && Array.isArray(translatedVal)) {
+        const articleType = key === "lpgportal_news_db" ? "news" : "user_content";
+        for (const a of translatedVal) {
+          await tx.article.upsert({
+            where: { id: a.id },
+            update: {
+              title: a.title || "",
+              summary: a.summary || "",
+              category: a.category || "",
+              date: new Date(a.date || Date.now()),
+              author: a.author || "",
+              image: a.image || null,
+              tags: a.tags || [],
+              likes: Number(a.likes || 0),
+              views: Number(a.views || 0),
+              content: a.content || "",
+              seoTitle: a.seoTitle || null,
+              seoDescription: a.seoDescription || null,
+              seoKeywords: a.seoKeywords || [],
+              openGraphSupport: a.openGraphSupport !== false,
+              googleNewsReady: a.googleNewsReady !== false,
+              socialShareText: a.socialShareText || null,
+              status: a.status || "Onay Bekliyor",
+              published: a.published === true,
+              publishedAt: a.publishedAt ? new Date(a.publishedAt) : null,
+              authorId: a.authorId || null,
+              approvedBy: a.approvedBy || null,
+              approvedAt: a.approvedAt ? new Date(a.approvedAt) : null,
+              articleType: articleType
+            },
+            create: {
+              id: a.id,
+              title: a.title || "",
+              summary: a.summary || "",
+              category: a.category || "",
+              date: new Date(a.date || Date.now()),
+              author: a.author || "",
+              image: a.image || null,
+              tags: a.tags || [],
+              likes: Number(a.likes || 0),
+              views: Number(a.views || 0),
+              content: a.content || "",
+              seoTitle: a.seoTitle || null,
+              seoDescription: a.seoDescription || null,
+              seoKeywords: a.seoKeywords || [],
+              openGraphSupport: a.openGraphSupport !== false,
+              googleNewsReady: a.googleNewsReady !== false,
+              socialShareText: a.socialShareText || null,
+              status: a.status || "Onay Bekliyor",
+              published: a.published === true,
+              publishedAt: a.publishedAt ? new Date(a.publishedAt) : null,
+              authorId: a.authorId || null,
+              approvedBy: a.approvedBy || null,
+              approvedAt: a.approvedAt ? new Date(a.approvedAt) : null,
+              articleType: articleType
+            }
+          });
+        }
+
+        const incomingIds = translatedVal.map((x: any) => x.id);
+        const existingItems = await tx.article.findMany({
+          where: { articleType: articleType },
+          select: { id: true, title: true }
+        });
+        const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
+        if (incomingIds.length > 2) { // Safeguard against wiping seeded db
+          for (const id of toDelete) {
+            const art = existingItems.find(x => x.id === id);
+            await tx.article.delete({ where: { id } });
+            await tx.auditLog.create({
+              data: {
+                actor: "API Sync",
+                action: "ARTICLE_DELETE",
+                details: `Deleted article ${art ? art.title : id} (${articleType})`,
+                ipAddress: req.ip
+              }
+            });
+          }
+        }
+      }
+
+      // 7. lpgportal_bulletins_db
+      if (key === "lpgportal_bulletins_db" && Array.isArray(translatedVal)) {
+        for (const b of translatedVal) {
+          await tx.bulletin.upsert({
+            where: { id: b.id },
+            update: {
+              title: b.title || "",
+              summary: b.summary || "",
+              category: b.category || "",
+              lpgBrand: b.lpgBrand || "",
+              date: new Date(b.date || Date.now()),
+              author: b.author || "",
+              authorTitle: b.authorTitle || null,
+              views: Number(b.views || 0),
+              likes: Number(b.likes || 0),
+              tags: b.tags || [],
+              content: b.content || "",
+              targetMotor: b.targetMotor || null,
+              compatibilityStatus: b.compatibilityStatus || null,
+              knownIssues: b.knownIssues || null,
+              recommendedKits: b.recommendedKits || [],
+              nozzleRecommendation: b.nozzleRecommendation || null,
+              regulatorRecommendation: b.regulatorRecommendation || null,
+              calibrationNotes: b.calibrationNotes || null,
+              seoTitle: b.seoTitle || null,
+              seoDescription: b.seoDescription || null,
+              seoKeywords: b.seoKeywords || [],
+              openGraphSupport: b.openGraphSupport !== false,
+              googleNewsReady: b.googleNewsReady !== false,
+              socialShareText: b.socialShareText || null
+            },
+            create: {
+              id: b.id,
+              title: b.title || "",
+              summary: b.summary || "",
+              category: b.category || "",
+              lpgBrand: b.lpgBrand || "",
+              date: new Date(b.date || Date.now()),
+              author: b.author || "",
+              authorTitle: b.authorTitle || null,
+              views: Number(b.views || 0),
+              likes: Number(b.likes || 0),
+              tags: b.tags || [],
+              content: b.content || "",
+              targetMotor: b.targetMotor || null,
+              compatibilityStatus: b.compatibilityStatus || null,
+              knownIssues: b.knownIssues || null,
+              recommendedKits: b.recommendedKits || [],
+              nozzleRecommendation: b.nozzleRecommendation || null,
+              regulatorRecommendation: b.regulatorRecommendation || null,
+              calibrationNotes: b.calibrationNotes || null,
+              seoTitle: b.seoTitle || null,
+              seoDescription: b.seoDescription || null,
+              seoKeywords: b.seoKeywords || [],
+              openGraphSupport: b.openGraphSupport !== false,
+              googleNewsReady: b.googleNewsReady !== false,
+              socialShareText: b.socialShareText || null
+            }
+          });
+        }
+
+        const incomingIds = translatedVal.map((x: any) => x.id);
+        const existingItems = await tx.bulletin.findMany({ select: { id: true, title: true } });
+        const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
+        if (incomingIds.length > 0) {
+          for (const id of toDelete) {
+            const bul = existingItems.find(x => x.id === id);
+            await tx.bulletin.delete({ where: { id } });
+            await tx.auditLog.create({
+              data: {
+                actor: "API Sync",
+                action: "BULLETIN_DELETE",
+                details: `Deleted bulletin ${bul ? bul.title : id}`,
+                ipAddress: req.ip
+              }
+            });
+          }
+        }
+      }
+
+      // 8. lpgportal_central_notifications
+      if (key === "lpgportal_central_notifications" && Array.isArray(translatedVal)) {
+        for (const n of translatedVal) {
+          await tx.notification.upsert({
+            where: { id: n.id },
+            update: {
+              userId: n.userId || "all",
+              title: n.title || "",
+              message: n.message || "",
+              type: n.type || "duyuru",
+              channel: n.channel || "panel",
+              createdAt: new Date(n.createdAt || Date.now()),
+              read: n.read === true
+            },
+            create: {
+              id: n.id,
+              userId: n.userId || "all",
+              title: n.title || "",
+              message: n.message || "",
+              type: n.type || "duyuru",
+              channel: n.channel || "panel",
+              createdAt: new Date(n.createdAt || Date.now()),
+              read: n.read === true
+            }
+          });
+        }
+
+        const incomingIds = translatedVal.map((x: any) => x.id);
+        const existingItems = await tx.notification.findMany({ select: { id: true } });
+        const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
+        if (incomingIds.length > 0) {
+          for (const id of toDelete) {
+            await tx.notification.delete({ where: { id } });
+            await tx.auditLog.create({
+              data: {
+                actor: "API Sync",
+                action: "NOTIFICATION_DELETE",
+                details: `Deleted notification ${id}`,
+                ipAddress: req.ip
+              }
+            });
+          }
+        }
+      }
+
+      // 9. lpgportal_home_reviews
+      if (key === "lpgportal_home_reviews" && Array.isArray(translatedVal)) {
+        for (const h of translatedVal) {
+          await tx.homeReview.upsert({
+            where: { id: h.id },
+            update: {
+              userId: h.userId || "",
+              authorName: h.authorName || "",
+              authorRole: h.authorRole || "",
+              profession: h.profession || null,
+              city: h.city || "",
+              carBrand: h.carBrand || null,
+              carModel: h.carModel || null,
+              title: h.title || "",
+              content: h.content || "",
+              rating: Number(h.rating || 5),
+              status: h.status || "Onay Bekliyor",
+              createdAt: new Date(h.createdAt || Date.now()),
+              updatedAt: new Date(h.updatedAt || Date.now())
+            },
+            create: {
+              id: h.id,
+              userId: h.userId || "",
+              authorName: h.authorName || "",
+              authorRole: h.authorRole || "",
+              profession: h.profession || null,
+              city: h.city || "",
+              carBrand: h.carBrand || null,
+              carModel: h.carModel || null,
+              title: h.title || "",
+              content: h.content || "",
+              rating: Number(h.rating || 5),
+              status: h.status || "Onay Bekliyor",
+              createdAt: new Date(h.createdAt || Date.now()),
+              updatedAt: new Date(h.updatedAt || Date.now())
+            }
+          });
+        }
+
+        const incomingIds = translatedVal.map((x: any) => x.id);
+        const existingItems = await tx.homeReview.findMany({ select: { id: true, title: true } });
+        const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
+        if (incomingIds.length > 0) {
+          for (const id of toDelete) {
+            const rev = existingItems.find(x => x.id === id);
+            await tx.homeReview.delete({ where: { id } });
+            await tx.auditLog.create({
+              data: {
+                actor: "API Sync",
+                action: "HOME_REVIEW_DELETE",
+                details: `Deleted review ${rev ? rev.title : id}`,
+                ipAddress: req.ip
+              }
+            });
+          }
+        }
+      }
+    });
 
     const db = readFallbackDb();
     db[key] = translatedVal;
