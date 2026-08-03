@@ -92,6 +92,14 @@ model Invoice {
   date           DateTime @default(now())
   membershipType String
   status         String   // "Ödendi" | "İade" | "İptal"
+  paymentMethod   String?
+  adminNote       String?
+  userName        String?
+  companyName     String?
+  roleDisplayName String?
+  packageName     String?
+  dekontStatus    String?
+  dekontUrl       String?
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -181,6 +189,7 @@ model Article {
   authorId          String?
   approvedBy        String?
   approvedAt        DateTime?
+  articleType       String    @default("news")
 }
 
 model Bulletin {
@@ -322,3 +331,13 @@ model HomeReview {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actor     String   @default("System")
+  action    String
+  details   String   @db.Text
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
+
