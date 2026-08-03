@@ -1,3 +1,4 @@
+import { lpgportalStorage as localStorage } from '@/src/lib/storage';
 import React, { useState, useEffect } from "react";
 import { useLanguage } from "../lib/LanguageContext";
 import { 
@@ -41,6 +42,8 @@ import {
   BarChart2
 } from "lucide-react";
 import { DbUser } from "../lib/membership";
+
+
 
 interface Phase2ModulesProps {
   activeUser: DbUser | null;
