@@ -1,5 +1,8 @@
+import { lpgportalStorage as localStorage } from '@/src/lib/storage';
 import { LpgBrand, Company, Vehicle, Article, Course, Job, MarketplaceProduct } from "./types";
 import { RAW_VEHICLES_DATA } from "./raw_vehicles";
+
+
 
 let cachedBrands: string[] | null = null;
 let lastVehiclesDbString: string | null = null;
