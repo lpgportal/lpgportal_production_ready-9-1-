@@ -1,3 +1,4 @@
+import { lpgportalStorage as localStorage } from '@/src/lib/storage';
 import React, { useState, useEffect, useRef } from "react";
 import { COMPANIES_DATA, MASTER_LPG_BRANDS, VEHICLES_DATA, getVehiclesDb } from "../data";
 import { QuoteRequest, QuoteOffer, Vehicle } from "../types";
@@ -5,6 +6,8 @@ import { DbUser } from "../lib/membership";
 import { TURKEY_DISTRICTS_DATA } from "../lib/turkey_districts";
 import { useLanguage } from "../lib/LanguageContext";
 import { 
+
+
   FileText, 
   MapPin, 
   Wrench, 
