@@ -1,3 +1,4 @@
+import { lpgportalStorage as localStorage } from '@/src/lib/storage';
 import React, { useState, useEffect, useMemo } from "react";
 import { COMPANIES_DATA } from "../data";
 import { Company, Review } from "../types";
@@ -11,6 +12,8 @@ import { DbUser, getUsers, saveUsers, getRoleDisplayName, addSystemLog } from ".
 import { renderCompanyLogo, getAutoLogoColor, getCompanyInitials } from "../lib/logoUtils";
 import { sanitizeHtml, escapeHtml, isPotentialSqlInjection } from "../lib/security";
 import { TURKEY_DISTRICTS_DATA } from "../lib/turkey_districts";
+
+
 
 interface CompanyDirectoryProps {
   activeUser?: DbUser | null;
