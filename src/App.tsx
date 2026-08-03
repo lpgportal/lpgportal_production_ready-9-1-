@@ -1,3 +1,4 @@
+import { lpgportalStorage as localStorage } from '@/src/lib/storage';
 import React, { useState, useEffect } from "react";
 import Navigation from "./components/Navigation";
 import CompatibilitySystem from "./components/CompatibilitySystem";
@@ -19,6 +20,8 @@ import Advertising from "./components/Advertising";
 import LegalPage, { LegalDocType } from "./components/LegalPage";
 import { useLanguage } from "./lib/LanguageContext";
 import { 
+
+
   Flame, 
   Calculator, 
   MapPin, 
