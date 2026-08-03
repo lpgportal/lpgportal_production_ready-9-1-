@@ -365,6 +365,7 @@ async function initDatabase() {
     } catch (seedErr) {
       console.error("Failed to check/seed PostgreSQL users:", seedErr);
     }
+    await seedPostgresFromJSON();
   } catch (err) {
     if (process.env.NODE_ENV === "production") {
       console.error("CRITICAL ERROR: PostgreSQL connection failed! JSON fallback database is DISABLED in production mode!", err);
@@ -377,6 +378,273 @@ async function initDatabase() {
   }
   validateAndFixDataIntegrity();
   await translateExistingDatabaseRecords();
+}
+
+async function seedPostgresFromJSON() {
+  console.log("=== Checking and Seeding PostgreSQL from JSON Fallback ===");
+  let fallbackDb: any = {};
+  try {
+    if (fs.existsSync(FALLBACK_DB_PATH)) {
+      fallbackDb = JSON.parse(fs.readFileSync(FALLBACK_DB_PATH, "utf8"));
+    } else {
+      console.log("fallback_db.json not found, skipping import.");
+      return;
+    }
+  } catch (e) {
+    console.error("Failed to read fallback_db.json for seeding Postgres:", e);
+    return;
+  }
+
+  try {
+    // 1. Articles (lpgportal_news_db & lpgportal_user_contents_db)
+    const articleCount = await prisma.article.count();
+    if (articleCount === 0) {
+      console.log("Seeding Article table...");
+      const news = fallbackDb["lpgportal_news_db"] || [];
+      const userContents = fallbackDb["lpgportal_user_contents_db"] || [];
+      
+      const seedArticles = [
+        ...news.map((x: any) => ({ ...x, articleType: "news" })),
+        ...userContents.map((x: any) => ({ ...x, articleType: "user_content" }))
+      ];
+
+      for (const a of seedArticles) {
+        await prisma.article.create({
+          data: {
+            id: a.id,
+            title: a.title || "",
+            summary: a.summary || "",
+            category: a.category || "",
+            date: new Date(a.date || Date.now()),
+            author: a.author || "",
+            image: a.image || null,
+            tags: a.tags || [],
+            likes: Number(a.likes || 0),
+            views: Number(a.views || 0),
+            content: a.content || "",
+            seoTitle: a.seoTitle || null,
+            seoDescription: a.seoDescription || null,
+            seoKeywords: a.seoKeywords || [],
+            openGraphSupport: a.openGraphSupport !== false,
+            googleNewsReady: a.googleNewsReady !== false,
+            socialShareText: a.socialShareText || null,
+            status: a.status || "Onaylandı",
+            published: a.published !== false,
+            publishedAt: a.publishedAt ? new Date(a.publishedAt) : null,
+            authorId: a.authorId || null,
+            approvedBy: a.approvedBy || null,
+            approvedAt: a.approvedAt ? new Date(a.approvedAt) : null,
+            articleType: a.articleType
+          }
+        });
+      }
+      console.log(`Successfully seeded ${seedArticles.length} articles.`);
+    }
+
+    // 2. Bulletins (lpgportal_bulletins_db)
+    const bulletinCount = await prisma.bulletin.count();
+    if (bulletinCount === 0) {
+      console.log("Seeding Bulletin table...");
+      const bulletins = fallbackDb["lpgportal_bulletins_db"] || [];
+      for (const b of bulletins) {
+        await prisma.bulletin.create({
+          data: {
+            id: b.id,
+            title: b.title || "",
+            summary: b.summary || "",
+            category: b.category || "",
+            lpgBrand: b.lpgBrand || "",
+            date: new Date(b.date || Date.now()),
+            author: b.author || "",
+            authorTitle: b.authorTitle || null,
+            views: Number(b.views || 0),
+            likes: Number(b.likes || 0),
+            tags: b.tags || [],
+            content: b.content || "",
+            targetMotor: b.targetMotor || null,
+            compatibilityStatus: b.compatibilityStatus || null,
+            knownIssues: b.knownIssues || null,
+            recommendedKits: b.recommendedKits || [],
+            nozzleRecommendation: b.nozzleRecommendation || null,
+            regulatorRecommendation: b.regulatorRecommendation || null,
+            calibrationNotes: b.calibrationNotes || null,
+            seoTitle: b.seoTitle || null,
+            seoDescription: b.seoDescription || null,
+            seoKeywords: b.seoKeywords || [],
+            openGraphSupport: b.openGraphSupport !== false,
+            googleNewsReady: b.googleNewsReady !== false,
+            socialShareText: b.socialShareText || null
+          }
+        });
+      }
+      console.log(`Successfully seeded ${bulletins.length} bulletins.`);
+    }
+
+    // 3. Notifications (lpgportal_central_notifications)
+    const notificationCount = await prisma.notification.count();
+    if (notificationCount === 0) {
+      console.log("Seeding Notification table...");
+      const notifications = fallbackDb["lpgportal_central_notifications"] || [];
+      for (const n of notifications) {
+        await prisma.notification.create({
+          data: {
+            id: n.id,
+            userId: n.userId || "all",
+            title: n.title || "",
+            message: n.message || "",
+            type: n.type || "duyuru",
+            channel: n.channel || "panel",
+            createdAt: new Date(n.createdAt || Date.now()),
+            read: n.read === true
+          }
+        });
+      }
+      console.log(`Successfully seeded ${notifications.length} notifications.`);
+    }
+
+    // 4. HomeReviews (lpgportal_home_reviews)
+    const reviewCount = await prisma.homeReview.count();
+    if (reviewCount === 0) {
+      console.log("Seeding HomeReview table...");
+      const reviews = fallbackDb["lpgportal_home_reviews"] || [];
+      for (const h of reviews) {
+        await prisma.homeReview.create({
+          data: {
+            id: h.id,
+            userId: h.userId || "",
+            authorName: h.authorName || "",
+            authorRole: h.authorRole || "",
+            profession: h.profession || null,
+            city: h.city || "",
+            carBrand: h.carBrand || null,
+            carModel: h.carModel || null,
+            title: h.title || "",
+            content: h.content || "",
+            rating: Number(h.rating || 5),
+            status: h.status || "Onaylandı",
+            createdAt: new Date(h.createdAt || Date.now())
+          }
+        });
+      }
+      console.log(`Successfully seeded ${reviews.length} reviews.`);
+    }
+
+    // 5. Invoices (lpgportal_invoices)
+    const invoiceCount = await prisma.invoice.count();
+    if (invoiceCount === 0) {
+      console.log("Seeding Invoice table...");
+      const invoices = fallbackDb["lpgportal_invoices"] || [];
+      for (const i of invoices) {
+        await prisma.invoice.create({
+          data: {
+            id: i.id,
+            userId: i.userId,
+            amount: Number(i.amount || 0),
+            date: new Date(i.date || Date.now()),
+            membershipType: i.membership_type || "",
+            status: i.status || "Beklemede",
+            paymentMethod: i.payment_method || null,
+            adminNote: i.admin_note || null,
+            userName: i.userName || null,
+            companyName: i.companyName || null,
+            roleDisplayName: i.roleDisplayName || null,
+            packageName: i.packageName || null,
+            dekontStatus: i.dekont_status || null,
+            dekontUrl: i.dekont_url || null
+          }
+        });
+      }
+      console.log(`Successfully seeded ${invoices.length} invoices.`);
+    }
+
+    // 6. Companies (lpgportal_companies)
+    const companyCount = await prisma.company.count();
+    if (companyCount === 0) {
+      console.log("Seeding Company table...");
+      const companies = fallbackDb["lpgportal_companies"] || [];
+      for (const c of companies) {
+        await prisma.company.create({
+          data: {
+            id: c.id,
+            companyName: c.companyName || "",
+            city: c.city || "",
+            district: c.district || "",
+            address: c.address || "",
+            phone: c.phone || "",
+            email: c.email || "",
+            website: c.website || null,
+            description: c.description || null,
+            logo: c.logo || null,
+            status: c.status || "Beklemede",
+            approvedStatus: c.approvedStatus !== false,
+            rating: Number(c.rating || 5),
+            ownerId: c.ownerId || null
+          }
+        });
+      }
+      console.log(`Successfully seeded ${companies.length} companies.`);
+    }
+
+    // 7. Products (lpgportal_products)
+    const productCount = await prisma.product.count();
+    if (productCount === 0) {
+      console.log("Seeding Product table...");
+      const products = fallbackDb["lpgportal_products"] || [];
+      for (const p of products) {
+        await prisma.product.create({
+          data: {
+            id: p.id,
+            name: p.name || "",
+            description: p.description || "",
+            price: Number(p.price || 0),
+            stock: Number(p.stock || 0),
+            category: p.category || "",
+            condition: p.condition || "",
+            conditionDetail: p.conditionDetail || "",
+            original: p.original !== false,
+            brand: p.brand || "",
+            city: p.city || "",
+            district: p.district || "",
+            images: p.images || [],
+            sellerId: p.sellerId || "",
+            status: p.status || "Aktif",
+            createdAt: new Date(p.createdAt || Date.now())
+          }
+        });
+      }
+      console.log(`Successfully seeded ${products.length} products.`);
+    }
+
+    // 8. Orders (lpgportal_orders)
+    const orderCount = await prisma.order.count();
+    if (orderCount === 0) {
+      console.log("Seeding Order table...");
+      const orders = fallbackDb["lpgportal_orders"] || [];
+      for (const o of orders) {
+        await prisma.order.create({
+          data: {
+            id: o.id,
+            productId: o.productId || "",
+            productName: o.productName || "",
+            buyerId: o.buyerId || "",
+            buyerName: o.buyerName || "",
+            buyerPhone: o.buyerPhone || "",
+            buyerEmail: o.buyerEmail || "",
+            buyerRole: o.buyerRole || "",
+            qty: Number(o.qty || 1),
+            totalPrice: Number(o.totalPrice || 0),
+            status: o.status || "Onay Bekliyor",
+            sellerId: o.sellerId || "",
+            sellerName: o.sellerName || ""
+          }
+        });
+      }
+      console.log(`Successfully seeded ${orders.length} orders.`);
+    }
+
+  } catch (err) {
+    console.error("Error during PostgreSQL auto-seeding from JSON:", err);
+  }
 }
 
 function checkAndSeedFallback() {
