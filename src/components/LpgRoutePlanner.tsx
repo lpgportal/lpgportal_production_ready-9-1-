@@ -1,9 +1,12 @@
+import { lpgportalStorage as localStorage } from '@/src/lib/storage';
 import React, { useState, useEffect, useRef } from "react";
 import { MapPin, Navigation, Car, AlertTriangle, Plus, Trash2, ShieldCheck, HelpCircle } from "lucide-react";
 import { CAR_BRANDS, VEHICLES_DATA, getVehiclesDb } from "../data";
 import { RAW_VEHICLES_DATA } from "../raw_vehicles";
 import { Vehicle } from "../types";
 import { useLanguage } from "../lib/LanguageContext";
+
+
 
 
 // Predefined Turkey locations for fast autocomplete search / offline fallback
