@@ -1,3 +1,4 @@
+import { lpgportalStorage as localStorage } from '@/src/lib/storage';
 import React, { useState, useEffect } from "react";
 import { useLanguage } from "../lib/LanguageContext";
 import { DbUser } from "../lib/membership";
@@ -15,6 +16,8 @@ import {
   Check 
 } from "lucide-react";
 import { ContactMessage, ContactConfig } from "./Contact";
+
+
 
 interface ContactAdminPanelProps {
   activeUser: DbUser | null;
