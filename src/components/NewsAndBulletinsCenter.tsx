@@ -1,6 +1,9 @@
+import { lpgportalStorage as localStorage } from '@/src/lib/storage';
 import React, { useState } from "react";
 import { useLanguage } from "../lib/LanguageContext";
 import { 
+
+
   Flame, 
   Search, 
   Sparkles, 
