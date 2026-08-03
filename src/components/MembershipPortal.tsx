@@ -1,3 +1,4 @@
+import { lpgportalStorage as localStorage } from '@/src/lib/storage';
 import React, { useState, useEffect } from "react";
 import { QuoteRequest, QuoteOffer, LocalProduct, OrderRequest, FeedbackRequest, FeedbackComment, Company } from "../types";
 import { 
@@ -100,6 +101,8 @@ import { renderCompanyLogo, getAutoLogoColor, getCompanyInitials } from "../lib/
 import { useLanguage } from "../lib/LanguageContext";
 import ContactAdminPanel from "./ContactAdminPanel";
 import CampaignsSystem from "./CampaignsSystem";
+
+
 
 const CATEGORY_PRESETS: Record<string, string> = {
   ECU: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=400",
