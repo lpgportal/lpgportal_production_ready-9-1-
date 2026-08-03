@@ -34,10 +34,91 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+const slowRequests: any[] = [];
+const SLOW_REQUEST_THRESHOLD_MS = 2000;
+
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    if (duration >= SLOW_REQUEST_THRESHOLD_MS) {
+      const entry = {
+        timestamp: new Date().toISOString(),
+        method: req.method,
+        url: req.originalUrl || req.url,
+        duration,
+        ip: req.ip
+      };
+      slowRequests.push(entry);
+      if (slowRequests.length > 50) slowRequests.shift();
+    }
+  });
+  next();
+});
+
 // ----------------------------------------------------
 // DATABASE ALTYAPISI & VERİ BÜTÜNLÜĞÜ (PRISMA + JSON FALLBACK)
 // ----------------------------------------------------
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  log: [
+    { emit: "event", level: "query" }
+  ]
+}) as any;
+
+const slowQueries: any[] = [];
+const unhandledExceptions: any[] = [];
+
+const SLOW_QUERY_THRESHOLD_MS = 1000;
+
+const EXCEPTIONS_LOG_PATH = path.join(process.cwd(), "unhandled_exceptions.log");
+const SLOW_QUERIES_LOG_PATH = path.join(process.cwd(), "slow_queries.log");
+
+function logException(err: any) {
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    message: err?.message || String(err),
+    stack: err?.stack || null
+  };
+  unhandledExceptions.push(logEntry);
+  if (unhandledExceptions.length > 50) unhandledExceptions.shift();
+  try {
+    fs.appendFileSync(EXCEPTIONS_LOG_PATH, JSON.stringify(logEntry) + "\n", "utf8");
+  } catch (e) {
+    console.error("Failed to write to exception log file:", e);
+  }
+}
+
+function logSlowQuery(queryEntry: any) {
+  slowQueries.push(queryEntry);
+  if (slowQueries.length > 50) slowQueries.shift();
+  try {
+    fs.appendFileSync(SLOW_QUERIES_LOG_PATH, JSON.stringify(queryEntry) + "\n", "utf8");
+  } catch (e) {
+    console.error("Failed to write to slow query log file:", e);
+  }
+}
+
+process.on("uncaughtException", (error) => {
+  console.error("UNCAUGHT EXCEPTION:", error);
+  logException(error);
+});
+
+process.on("unhandledRejection", (reason: any) => {
+  console.error("UNHANDLED REJECTION:", reason);
+  logException(reason instanceof Error ? reason : new Error(String(reason)));
+});
+
+prisma.$on("query", (e: any) => {
+  if (e.duration >= SLOW_QUERY_THRESHOLD_MS) {
+    logSlowQuery({
+      timestamp: new Date().toISOString(),
+      query: e.query,
+      params: e.params,
+      duration: e.duration
+    });
+  }
+});
+
 let useFallback = true;
 const FALLBACK_DB_PATH = path.join(process.cwd(), "prisma", "fallback_db.json");
 let fallbackDbCache: any = null;
@@ -1370,11 +1451,10 @@ const rateLimiter = (req: express.Request, res: express.Response, next: express.
   }
   next();
 };
-
 // CSRF Protection Middleware
 const csrfProtection = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  // Exclude PayTR webhook callbacks from CSRF
-  if (req.path === "/payment/paytr-callback" || req.path === "/api/payment/paytr-callback") {
+  // Exclude PayTR webhook callbacks and health check from CSRF
+  if (req.path === "/payment/paytr-callback" || req.path === "/api/payment/paytr-callback" || req.path === "/api/health" || req.path === "/health") {
     return next();
   }
 
@@ -1404,11 +1484,12 @@ const sqlInjectionFilter = (req: express.Request, res: express.Response, next: e
 
 // API Session Authorization Middleware
 const verifyApiSession = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  // Exclude webhooks, DB, and session check endpoints
+  // Exclude webhooks, DB, health checks, and session check endpoints
   if (
     req.path === "/payment/paytr-callback" || req.path === "/api/payment/paytr-callback" ||
     req.path === "/db/get-all" || req.path === "/api/db/get-all" ||
     req.path === "/db/save" || req.path === "/api/db/save" ||
+    req.path === "/api/health" || req.path === "/health" ||
     req.path.startsWith("/api/auth/session/") || req.path.startsWith("/auth/session/")
   ) {
     return next();
@@ -3079,6 +3160,82 @@ app.post("/api/db/save", async (req, res) => {
       return res.status(500).json({ error: err.message });
     }
   }
+});
+
+
+// ----------------------------------------------------
+// MONITORING & HEALTH CHECKS
+// ----------------------------------------------------
+app.get("/api/health", async (req, res) => {
+  let dbStatus = "unhealthy";
+  let dbDetails = {};
+  
+  try {
+    const start = Date.now();
+    await prisma.$queryRaw`SELECT 1`;
+    const ping = Date.now() - start;
+    dbStatus = "healthy";
+    dbDetails = { mode: "postgres", pingMs: ping };
+  } catch (err: any) {
+    dbStatus = "unhealthy";
+    dbDetails = {
+      mode: useFallback ? "fallback" : "postgres_failed",
+      error: err.message
+    };
+  }
+
+  let exceptionLogCount = 0;
+  let slowQueryLogCount = 0;
+  
+  try {
+    if (fs.existsSync(EXCEPTIONS_LOG_PATH)) {
+      const data = fs.readFileSync(EXCEPTIONS_LOG_PATH, "utf8");
+      exceptionLogCount = data.trim().split("\n").filter(Boolean).length;
+    }
+  } catch (e) {}
+
+  try {
+    if (fs.existsSync(SLOW_QUERIES_LOG_PATH)) {
+      const data = fs.readFileSync(SLOW_QUERIES_LOG_PATH, "utf8");
+      slowQueryLogCount = data.trim().split("\n").filter(Boolean).length;
+    }
+  } catch (e) {}
+
+  res.json({
+    status: dbStatus === "healthy" ? "UP" : "DEGRADED",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    env: process.env.NODE_ENV || "development",
+    useFallback,
+    system: {
+      memory: {
+        freeBytes: os.freemem(),
+        totalBytes: os.totalmem(),
+        processRssBytes: process.memoryUsage().rss,
+        processHeapTotalBytes: process.memoryUsage().heapTotal,
+        processHeapUsedBytes: process.memoryUsage().heapUsed
+      },
+      cpu: {
+        loadavg: os.loadavg(),
+        cores: os.cpus().length
+      }
+    },
+    database: {
+      status: dbStatus,
+      details: dbDetails,
+      syncVersion: dbVersion
+    },
+    metrics: {
+      slowQueriesInMemory: slowQueries.length,
+      slowQueriesLoggedCount: slowQueryLogCount,
+      slowRequestsInMemory: slowRequests.length,
+      unhandledExceptionsInMemory: unhandledExceptions.length,
+      unhandledExceptionsLoggedCount: exceptionLogCount
+    },
+    recentSlowRequests: slowRequests.slice(-5),
+    recentSlowQueries: slowQueries.slice(-5),
+    recentUnhandledExceptions: unhandledExceptions.slice(-5)
+  });
 });
 
 
