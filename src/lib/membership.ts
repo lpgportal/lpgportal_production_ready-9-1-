@@ -1,6 +1,9 @@
+import { lpgportalStorage as localStorage } from '@/src/lib/storage';
 // React-based Role-based Membership and Subscription State Engine
 // This manages custom user data, database schemas, local persistence, mock database seeding, and admin panel stats.
 import { hashPassword } from "./security";
+
+
 
 export interface DbUser {
   id: string;
