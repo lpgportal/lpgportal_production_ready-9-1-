@@ -15,19 +15,23 @@ export const lpgportalStorage = {
   getItem(key: string): string | null {
     if (typeof window === "undefined") return null;
     
-    // For business data keys starting with "lpgportal_"
-    if (key.startsWith("lpgportal_")) {
+    const isSessionKey = key === "lpgportal_active_user" || key === "lpgportal_active_user_sig";
+    
+    // For business data keys starting with "lpgportal_" (excluding local-only session keys)
+    if (key.startsWith("lpgportal_") && !isSessionKey) {
       return window.lpgportal_db[key] || null;
     }
     
-    // Fallback to native localStorage for other keys (like theme, language context)
+    // Fallback to native localStorage for other keys (like theme, language context, active user)
     return window.localStorage.getItem(key);
   },
 
   setItem(key: string, value: string): void {
     if (typeof window === "undefined") return;
 
-    if (key.startsWith("lpgportal_")) {
+    const isSessionKey = key === "lpgportal_active_user" || key === "lpgportal_active_user_sig";
+
+    if (key.startsWith("lpgportal_") && !isSessionKey) {
       window.lpgportal_db[key] = String(value);
 
       // Parse value to submit
@@ -70,7 +74,9 @@ export const lpgportalStorage = {
   removeItem(key: string): void {
     if (typeof window === "undefined") return;
 
-    if (key.startsWith("lpgportal_")) {
+    const isSessionKey = key === "lpgportal_active_user" || key === "lpgportal_active_user_sig";
+
+    if (key.startsWith("lpgportal_") && !isSessionKey) {
       delete window.lpgportal_db[key];
 
       fetch("/api/db/save", {
