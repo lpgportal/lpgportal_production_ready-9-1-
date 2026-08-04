@@ -16,6 +16,32 @@ import { SmsAdapterFactory, loadSmsConfig } from "./src/lib/integrations/smsAdap
 import { EmailAdapterFactory, loadEmailConfig } from "./src/lib/integrations/emailAdapter";
 import { PaymentAdapterFactory, loadPaymentConfig } from "./src/lib/integrations/paymentAdapter";
 import { verifySession, isPotentialSqlInjection, hashPassword, verifyPassword } from "./src/lib/security";
+import winston from "winston";
+
+// Ensure logs directory exists
+if (!fs.existsSync(path.join(__dirname, "logs"))) {
+  fs.mkdirSync(path.join(__dirname, "logs"), { recursive: true });
+}
+
+// Configure Winston Structured Logger
+const logger = winston.createLogger({
+  level: "info",
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  defaultMeta: { service: "lpg-portal-backend" },
+  transports: [
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    }),
+    new winston.transports.File({ filename: "logs/error.log", level: "error" }),
+    new winston.transports.File({ filename: "logs/combined.log" })
+  ]
+});
 
 // Initialize environment variables
 dotenv.config();
@@ -377,6 +403,7 @@ async function initDatabase() {
   try {
     await prisma.$connect();
     console.log("Successfully connected to PostgreSQL via Prisma Client.");
+    logger.info("Successfully connected to PostgreSQL via Prisma Client.");
     useFallback = false;
 
     // Seed default users if they are missing
@@ -389,8 +416,9 @@ async function initDatabase() {
         let fallbackDb: any = {};
         try {
           fallbackDb = JSON.parse(fs.readFileSync(FALLBACK_DB_PATH, "utf8"));
-        } catch (e) {
+        } catch (e: any) {
           console.warn("Failed to read fallback_db.json for seeding:", e);
+          logger.warn("Failed to read fallback_db.json for seeding", { error: e.message });
         }
         const defaultUsers = fallbackDb["lpgportal_users"] || [
           {
@@ -474,19 +502,23 @@ async function initDatabase() {
             });
           }
         }
-      } catch (recoverErr) {
+      } catch (recoverErr: any) {
         console.error("Failed to recover seed users passwords in PostgreSQL:", recoverErr);
+        logger.error("Failed to recover seed users passwords in PostgreSQL", { error: recoverErr.message });
       }
-    } catch (seedErr) {
+    } catch (seedErr: any) {
       console.error("Failed to check/seed PostgreSQL users:", seedErr);
+      logger.error("Failed to check/seed PostgreSQL users", { error: seedErr.message });
     }
     await seedPostgresFromJSON();
-  } catch (err) {
+  } catch (err: any) {
     if (process.env.NODE_ENV === "production") {
       console.error("CRITICAL ERROR: PostgreSQL connection failed! JSON fallback database is DISABLED in production mode!", err);
+      logger.error("CRITICAL ERROR: PostgreSQL connection failed in production mode", { error: err.message, stack: err.stack });
       useFallback = false;
     } else {
       console.error("PostgreSQL connection failed. Using JSON fallback database.", err);
+      logger.error("PostgreSQL connection failed. Using JSON fallback database", { error: err.message, stack: err.stack });
       useFallback = true;
       checkAndSeedFallback();
     }
@@ -1448,7 +1480,6 @@ async function translateExistingDatabaseRecords() {
 // API ROUTES
 // ----------------------------------------------------
 
-// In-Memory Rate Limiter to protect expensive AI routes from abuse (DoW Protection)
 const ipRequestCounts = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 25; // 25 requests/minute
@@ -1460,7 +1491,7 @@ const rateLimiter = (req: express.Request, res: express.Response, next: express.
              req.ip || 
              req.socket.remoteAddress || 
              "unknown";
-             
+              
   const now = Date.now();
 
   // Exclude database sync endpoints and QA secret requests from rate limiting
@@ -1483,6 +1514,7 @@ const rateLimiter = (req: express.Request, res: express.Response, next: express.
 
   if (record.count > MAX_REQUESTS_PER_WINDOW) {
     console.warn(`[Rate Limit Exceeded] Blocked request from IP: ${ip} to path: ${req.path}`);
+    logger.warn("Rate Limit Exceeded", { ip, path: req.path, count: record.count });
     return res.status(429).json({ error: "Çok fazla istek gönderildi. Lütfen bir dakika bekleyin." });
   }
   next();
@@ -1497,6 +1529,7 @@ const csrfProtection = (req: express.Request, res: express.Response, next: expre
   const secureHeader = req.headers["x-lpgportal-secure"];
   if (!secureHeader || secureHeader !== "true") {
     console.warn(`[CSRF Blocked] Request to ${req.path} from IP ${req.ip} is missing X-LpgPortal-Secure header.`);
+    logger.warn("CSRF Blocked", { ip: req.ip, path: req.path });
     return res.status(403).json({ error: "Güvenlik Doğrulaması Başarısız (CSRF Koruması)." });
   }
   next();
@@ -1512,6 +1545,7 @@ const sqlInjectionFilter = (req: express.Request, res: express.Response, next: e
   for (const input of inputsToCheck) {
     if (typeof input === "string" && isPotentialSqlInjection(input)) {
       console.warn(`[SQLi Blocked] Suspicious SQL Injection pattern detected in request to ${req.path} from IP ${req.ip}`);
+      logger.warn("SQL Injection Blocked", { ip: req.ip, path: req.path, input: input.substring(0, 100) });
       return res.status(400).json({ error: "Güvenlik Uyarısı: Girişte geçersiz karakterler tespit edildi." });
     }
   }
@@ -1549,12 +1583,14 @@ const verifyApiSession = (req: express.Request, res: express.Response, next: exp
 
   if (!userId || !email || !role || !token) {
     console.warn(`[Auth Blocked] Missing authorization headers for request to ${req.path} from IP ${req.ip}`);
+    logger.warn("Auth Header Verification Failed", { ip: req.ip, path: req.path });
     return res.status(401).json({ error: "Oturum doğrulaması başarısız. Lütfen giriş yapın." });
   }
 
   const isValid = verifySession({ id: userId, email, role }, token);
   if (!isValid) {
     console.warn(`[Auth Violation] Tampered session token detected for user ${email} from IP ${req.ip}`);
+    logger.warn("Tampered session token detected", { userId, email, ip: req.ip, path: req.path });
     return res.status(401).json({ error: "Oturum anahtarı geçersiz veya süresi dolmuş." });
   }
 
@@ -1562,6 +1598,10 @@ const verifyApiSession = (req: express.Request, res: express.Response, next: exp
   if (req.path === "/ai/generate-news-bulletin" || req.path === "/api/ai/generate-news-bulletin") {
     if (role !== "admin") {
       console.warn(`[Auth Violation] Unauthorized access attempt to news generator by user ${email} (Role: ${role})`);
+      logger.warn("Unauthorized Role Access", { email, role, path: req.path, ip: req.ip });
+      return res.status(403).json({ error: "Bu işlem için yetkiniz bulunmamaktadır." });
+    }
+  }`[Auth Violation] Unauthorized access attempt to news generator by user ${email} (Role: ${role})`);
       return res.status(403).json({ error: "Bu işlem için yetkiniz bulunmamaktadır." });
     }
   }
