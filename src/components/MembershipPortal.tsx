@@ -3162,7 +3162,7 @@ export default function MembershipPortal({
   };
 
   // Handle Sign In submission
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
     setAuthSuccess("");
@@ -3179,99 +3179,38 @@ export default function MembershipPortal({
       return;
     }
 
-    const emailKey = loginEmail.toLowerCase().trim();
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-LpgPortal-Secure": "true"
+        },
+        body: JSON.stringify({
+          email: loginEmail,
+          password: loginPassword
+        })
+      });
 
-    // 2. Brute Force / lockout check
-    const attemptsRaw = localStorage.getItem("lpgportal_login_attempts");
-    let attemptsRegistry: Record<string, { count: number; lockoutUntil: number }> = {};
-    if (attemptsRaw) {
-      try {
-        attemptsRegistry = JSON.parse(attemptsRaw);
-      } catch (err) {}
-    }
-
-    const attempt = attemptsRegistry[emailKey];
-    if (attempt && Date.now() < attempt.lockoutUntil) {
-      const remainingSecs = Math.ceil((attempt.lockoutUntil - Date.now()) / 1000);
-      setAuthError(`Çok fazla başarısız giriş denemesi. Lütfen ${remainingSecs} saniye sonra tekrar deneyin.`);
-      addSystemLog("Yetkisiz Erişim Girişimi", `Engellenen hesaba giriş denemesi: ${loginEmail}`);
-      return;
-    }
-
-    const currentUsers = getUsers();
-    const foundUser = currentUsers.find(
-      (u) => u.email.toLowerCase().trim() === emailKey
-    );
-
-    if (!foundUser) {
-      setAuthError("Bu e-posta adresiyle kayıtlı bir kullanıcı bulunamadı.");
-      // Record failed attempt for non-existent user to prevent scan attacks
-      const nowCount = (attempt ? attempt.count : 0) + 1;
-      const lockoutTime = nowCount >= 5 ? Date.now() + 5 * 60 * 1000 : 0;
-      attemptsRegistry[emailKey] = { count: nowCount, lockoutUntil: lockoutTime };
-      localStorage.setItem("lpgportal_login_attempts", JSON.stringify(attemptsRegistry));
-      
-      addSystemLog("Giriş Denemesi", `Tanımsız e-posta ile başarısız giriş: ${loginEmail}`);
-      return;
-    }
-
-    // 3. Password check using salt-and-pepper hashes (supports both v1 and v2 formats)
-    const isPasswordValid = verifyPassword(loginPassword, foundUser.email, foundUser.password);
-    if (!isPasswordValid) {
-      const nowCount = (attempt ? attempt.count : 0) + 1;
-      const remains = 5 - nowCount;
-      const lockoutTime = nowCount >= 5 ? Date.now() + 5 * 60 * 1000 : 0;
-      attemptsRegistry[emailKey] = { count: nowCount, lockoutUntil: lockoutTime };
-      localStorage.setItem("lpgportal_login_attempts", JSON.stringify(attemptsRegistry));
-
-      if (nowCount >= 5) {
-        setAuthError("Çok fazla başarısız giriş denemesi yapıldı. Hesabınız 5 dakika süreyle bloke edilmiştir.");
-        addSystemLog("Brute Force Şüphesi", `Ardışık 5 başarısız deneme sonucu hesap kilitlendi: ${loginEmail}`);
-      } else {
-        setAuthError(`Girdiğiniz şifre hatalı. Kalan deneme hakkınız: ${remains}`);
-        addSystemLog("Başarısız Giriş", `Hatalı şifre denemesi (Deneme: ${nowCount}/5): ${loginEmail}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setAuthError(data.error || "Giriş doğrulaması başarısız.");
+        return;
       }
-      return;
-    }
 
-    // Auto-migrate to v2 (10,000 rounds) password hash on successful login if it's currently in v1 format
-    if (!foundUser.password.startsWith("v2_")) {
-      const newV2Hash = hashPassword(loginPassword, foundUser.email);
-      foundUser.password = newV2Hash;
-      
-      const updatedUsers = currentUsers.map(u => u.id === foundUser.id ? foundUser : u);
-      saveUsers(updatedUsers);
-      addSystemLog("Şifre Yükseltme", `Kullanıcı şifresi v2 (10k turlu esnetme) formatına otomatik yükseltildi: ${loginEmail}`);
+      // Success login!
+      setAuthSuccess("Giriş başarıyla sağlandı! Profilinize yönlendiriliyorsunuz...");
+      setTimeout(() => {
+        onLoginSuccess(data.user);
+        setLoginEmail("");
+        setLoginPassword("");
+        setAuthSuccess("");
+      }, 1000);
+    } catch (err) {
+      setAuthError("Sistem hatası. Lütfen daha sonra tekrar deneyiniz.");
+      console.error("Login request failed:", err);
     }
-
-    // Success login: clear lockout registry for this account
-    if (attemptsRegistry[emailKey]) {
-      delete attemptsRegistry[emailKey];
-      localStorage.setItem("lpgportal_login_attempts", JSON.stringify(attemptsRegistry));
-    }
-
-    // Check membership status blocks
-    if (foundUser.membership_status === "Onay Bekliyor" || foundUser.membership_status === "Beklemede") {
-      setAuthError("Tebrikler! Profiliniz başarıyla oluşturuldu. Kurum profil kaydınızı onayladığında hesabınıza giriş yapabilirsiniz.");
-      return;
-    }
-
-    if (foundUser.membership_status === tLocal("Askıya Alındı", "Suspended") || foundUser.membership_status === tLocal("İptal", "Cancel")) {
-      setAuthError("Hesabınız idari işlem veya talep üzerine askıya alınmıştır. Lütfen destek birimiyle iletişime geçiniz.");
-      return;
-    }
-
-    // Success login!
-    setAuthSuccess("Giriş başarıyla sağlandı! Profilinize yönlendiriliyorsunuz...");
-    setTimeout(() => {
-      onLoginSuccess(foundUser);
-      setLoginEmail("");
-      setLoginPassword("");
-      setAuthSuccess("");
-    }, 1000);
   };
-
-
 
   const handleCouponCodeCheck = (codeToCheck: string) => {
     const normalized = codeToCheck.trim().toUpperCase();
