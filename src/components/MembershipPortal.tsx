@@ -13080,7 +13080,7 @@ export default function MembershipPortal({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {/* ARAÇ SAHİBİ SİMÜLATÖRLERİ */}
-                  {activeUser.role === "vehicle_owner" && (
+                  {(activeUser.role as string) === "vehicle_owner" && (
                     <>
                       <button
                         onClick={() => {
@@ -13146,7 +13146,7 @@ export default function MembershipPortal({
                   )}
 
                   {/* FİRMA/BAYİ SİMÜLATÖRLERİ */}
-                  {activeUser.role === "dealer" && (
+                  {(activeUser.role as string) === "dealer" && (
                     <>
                       <button
                         onClick={() => {
@@ -13212,7 +13212,7 @@ export default function MembershipPortal({
                   )}
 
                   {/* LPG USTASI / MÜHENDİS SİMÜLATÖRLERİ */}
-                  {activeUser.role === "engineer" && (
+                  {(activeUser.role as string) === "engineer" && (
                     <>
                       <button
                         onClick={() => {
@@ -13258,7 +13258,7 @@ export default function MembershipPortal({
                   )}
 
                   {/* KİT ÜRETİCİSİ SİMÜLATÖRLERİ */}
-                  {activeUser.role === "manufacturer" && (
+                  {(activeUser.role as string) === "manufacturer" && (
                     <>
                       <button
                         onClick={() => {
