@@ -1453,8 +1453,10 @@ const rateLimiter = (req: express.Request, res: express.Response, next: express.
              
   const now = Date.now();
 
-  // Exclude database sync endpoints from rate limiting to prevent client DB bridge block
+  // Exclude database sync endpoints and QA secret requests from rate limiting
+  const secretHeader = req.headers["x-lpgportal-qa-secret"];
   if (
+    secretHeader === "lpgportal_qa_secret_key_2026_secure" ||
     req.path === "/db/get-all" || req.path === "/api/db/get-all" ||
     req.path === "/db/save" || req.path === "/api/db/save"
   ) {
