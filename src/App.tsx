@@ -839,6 +839,8 @@ export default function App() {
     };
 
     // 1. Run checks periodically
+    checkSession();
+    pollDatabaseUpdates();
     const interval = setInterval(checkSession, 2000);
     const dbInterval = setInterval(pollDatabaseUpdates, 3000);
 
