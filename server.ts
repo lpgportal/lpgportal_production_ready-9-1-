@@ -23,6 +23,16 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// Global OWASP Security Headers Middleware
+app.use((req, res, next) => {
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Security-Policy", "default-src 'self' https: 'unsafe-inline' 'unsafe-eval' data:; img-src 'self' data: https:; font-src 'self' https: data:; connect-src 'self' https:;");
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  res.setHeader("Referrer-Policy", "no-referrer-when-downgrade");
+  next();
+});
+
 // 301 Redirect www subdomains to canonical non-www
 app.use((req, res, next) => {
   const host = req.headers.host;
