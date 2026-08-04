@@ -1492,6 +1492,8 @@ const verifyApiSession = (req: express.Request, res: express.Response, next: exp
     req.path === "/db/get-all" || req.path === "/api/db/get-all" ||
     req.path === "/db/save" || req.path === "/api/db/save" ||
     req.path === "/api/health" || req.path === "/health" ||
+    req.path === "/api/auth/login" || req.path === "/auth/login" ||
+    req.path === "/api/auth/session" || req.path === "/auth/session" ||
     req.path.startsWith("/api/auth/session/") || req.path.startsWith("/auth/session/")
   ) {
     return next();
