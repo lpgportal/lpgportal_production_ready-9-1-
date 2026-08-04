@@ -3643,7 +3643,7 @@ app.post("/api/qa/seed-load-test", express.json(), async (req, res) => {
         id: `user_load_test_${i}_${Date.now()}`,
         name: `Load Test User ${i}`,
         email: saltEmail,
-        phone: `5320000${String(i).padStart(3, '0')}`,
+        phone: '532' + String(Math.floor(1000000 + Math.random() * 9000000)),
         password: hash,
         role: "vehicle_owner",
         membershipType: "Araç Sahibi Yıllık Paket (Ücretsiz)",
@@ -3700,6 +3700,9 @@ app.post("/api/qa/cleanup", express.json(), async (req, res) => {
         if (["admin@lpgportal.com", "hata@hata.com", "servis@lpgportal.com", "kit@lpgportal.com"].includes(normalized)) {
           return true;
         }
+        if (normalized.includes("load_test_user")) {
+          return false;
+        }
         return !emails.map((e: string) => e.toLowerCase().trim()).includes(normalized);
       });
       db["lpgportal_users"] = users;
@@ -3708,6 +3711,13 @@ app.post("/api/qa/cleanup", express.json(), async (req, res) => {
     }
 
     await prisma.$transaction(async (tx) => {
+      // Direct bulk delete for load test pattern
+      await tx.user.deleteMany({
+        where: {
+          email: { contains: "load_test_user" }
+        }
+      });
+
       for (const email of emails) {
         const normalized = email.toLowerCase().trim();
         if (["admin@lpgportal.com", "hata@hata.com", "servis@lpgportal.com", "kit@lpgportal.com"].includes(normalized)) {
