@@ -2820,7 +2820,7 @@ app.post("/api/db/save", async (req, res) => {
             update: {
               name: u.name,
               phone: u.phone,
-              password: u.password,
+              ...(u.password ? { password: u.password } : {}),
               role: u.role,
               membershipType: u.membership_type || "Ziyaretçi",
               membershipFee: Number(u.membership_fee || 0),
