@@ -3540,7 +3540,8 @@ app.get("/api/qa/verify-db", async (req, res) => {
         role: true,
         password: true,
         activeSessionId: true,
-        membershipStatus: true
+        membershipStatus: true,
+        marketingApproved: true
       }
     });
 
