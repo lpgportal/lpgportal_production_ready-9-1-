@@ -535,7 +535,7 @@ export default function App() {
 
   const handleLoginSuccess = (user: DbUser) => {
     // 1. Generate unique active session ID
-    const newSessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const newSessionId = user.active_session_id || Math.random().toString(36).substring(2) + Date.now().toString(36);
     sessionStorage.setItem("lpgportal_session_id", newSessionId);
 
     // 2. Detect browser, device, and simulated IP
