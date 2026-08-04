@@ -371,6 +371,21 @@ async function initDatabase() {
 
     // Seed default users if they are missing
     try {
+      // Temporary password restoration on startup
+      try {
+        await prisma.user.update({
+          where: { email: "admin@lpgportal.com" },
+          data: { password: "v2_d1b5a627d38fb141ccf463663195b1adf47692a773b51c91e3595e1ab9fa44f1" }
+        });
+        await prisma.user.update({
+          where: { email: "hata@hata.com" },
+          data: { password: "v2_bf62d3b701d55ae8ad0dedec84f3d42f6a5051fd09b2c95e1f7518f2e6c10924" }
+        });
+        console.log("Passwords successfully restored on startup.");
+      } catch (pwdErr) {
+        console.error("Failed to restore passwords on startup:", pwdErr);
+      }
+
       const adminExists = await prisma.user.findUnique({
         where: { email: "admin@lpgportal.com" }
       });
