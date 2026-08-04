@@ -3470,7 +3470,7 @@ app.post("/api/db/save", async (req, res) => {
 
 // QA Database Verification API (Staging/QA only)
 app.get("/api/qa/verify-db", async (req, res) => {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" && process.env.ENABLE_QA_ENDPOINTS !== "true") {
     return res.status(404).json({ error: "Not Found" });
   }
 
@@ -3545,7 +3545,7 @@ app.get("/api/qa/verify-db", async (req, res) => {
 
 // QA Database Cleanup API (Staging/QA only)
 app.post("/api/qa/cleanup", express.json(), async (req, res) => {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" && process.env.ENABLE_QA_ENDPOINTS !== "true") {
     return res.status(404).json({ error: "Not Found" });
   }
 
@@ -3594,7 +3594,7 @@ app.post("/api/qa/cleanup", express.json(), async (req, res) => {
 
 // QA Database Backup and Restore Verification API (Staging/QA only)
 app.post("/api/qa/backup-restore-test", async (req, res) => {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" && process.env.ENABLE_QA_ENDPOINTS !== "true") {
     return res.status(404).json({ error: "Not Found" });
   }
 
