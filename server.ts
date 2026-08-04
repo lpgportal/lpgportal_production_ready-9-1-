@@ -445,6 +445,28 @@ async function initDatabase() {
         }
         console.log("PostgreSQL default users seeded successfully.");
       }
+
+      // Seeding recovery / password verification
+      try {
+        const seedUsersInfo = [
+          { email: "admin@lpgportal.com", pass: "Admin34." },
+          { email: "hata@hata.com", pass: "A1qwe2022.q" },
+          { email: "servis@lpgportal.com", pass: "Servis34." },
+          { email: "kit@lpgportal.com", pass: "Kit34." }
+        ];
+        for (const info of seedUsersInfo) {
+          const u = await prisma.user.findUnique({ where: { email: info.email } });
+          if (u && (!u.password || u.password.trim() === "")) {
+            console.log(`Fixing empty password hash for seed user: ${info.email}`);
+            await prisma.user.update({
+              where: { email: info.email },
+              data: { password: hashPassword(info.pass, info.email) }
+            });
+          }
+        }
+      } catch (recoverErr) {
+        console.error("Failed to recover seed users passwords in PostgreSQL:", recoverErr);
+      }
     } catch (seedErr) {
       console.error("Failed to check/seed PostgreSQL users:", seedErr);
     }
