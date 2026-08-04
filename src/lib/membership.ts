@@ -57,6 +57,11 @@ export interface DbUser {
   last_login_time?: string;
   last_login_ip?: string;
   last_login_device?: string;
+
+  // Subscription Details
+  subscription_type?: "free" | "premium";
+  subscription_status?: "active" | "expired" | "canceled";
+  subscription_expires_at?: string;
 }
 
 export interface FaturaHistory {
@@ -66,7 +71,7 @@ export interface FaturaHistory {
   date: string;
   membership_type: string;
   status: "Ödendi" | "İade" | "İptal" | "Beklemede" | "Reddedildi" | "İnceleniyor" | "Eksik Evrak";
-  payment_method?: "Kredi Kartı" | "Havale/EFT" | "Ücretsiz Kod";
+  payment_method?: "Kredi Kartı" | "Havale/EFT" | "Ücretsiz Kod" | "Ücretsiz Üyelik";
   admin_note?: string;
   userName?: string;
   companyName?: string;
