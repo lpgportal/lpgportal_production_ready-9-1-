@@ -140,7 +140,7 @@ export function isPotentialSqlInjection(input: string): boolean {
   if (!input) return false;
   const patterns = [
     /\bUNION\b\s+\bSELECT\b/i,
-    /\bOR\b\s+\d+\s*=\s*\d+/i,
+    /\bOR\b\s+['"]?\d+['"]?\s*=\s*['"]?\d+['"]?/i,
     /\bDROP\b\s+\bTABLE\b/i,
     /;\s*\bDROP\b/i,
     /;\s*\bDELETE\b/i,
