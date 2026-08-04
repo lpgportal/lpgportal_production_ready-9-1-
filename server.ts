@@ -7,6 +7,7 @@ import fs from "fs";
 import { PrismaClient } from "@prisma/client";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import jwt from "jsonwebtoken";
 import { NetgsmService } from "./src/lib/integrations/netgsm";
 import { ResendService } from "./src/lib/integrations/resend";
 import { R2StorageService } from "./src/lib/integrations/r2";
@@ -14,7 +15,7 @@ import { PayTrService } from "./src/lib/integrations/paytr";
 import { SmsAdapterFactory, loadSmsConfig } from "./src/lib/integrations/smsAdapter";
 import { EmailAdapterFactory, loadEmailConfig } from "./src/lib/integrations/emailAdapter";
 import { PaymentAdapterFactory, loadPaymentConfig } from "./src/lib/integrations/paymentAdapter";
-import { verifySession, isPotentialSqlInjection, hashPassword } from "./src/lib/security";
+import { verifySession, isPotentialSqlInjection, hashPassword, verifyPassword } from "./src/lib/security";
 
 // Initialize environment variables
 dotenv.config();
@@ -22,11 +23,12 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-// 301 Redirect www to non-www
+// 301 Redirect www subdomains to canonical non-www
 app.use((req, res, next) => {
   const host = req.headers.host;
-  if (host && host.startsWith("www.lpgportal.com")) {
-    return res.redirect(301, `https://lpgportal.com${req.originalUrl}`);
+  if (host && host.startsWith("www.")) {
+    const canonicalHost = host.replace(/^www\./, "");
+    return res.redirect(301, `https://${canonicalHost}${req.originalUrl}`);
   }
   next();
 });
@@ -2169,10 +2171,283 @@ app.post("/api/email/send", async (req, res) => {
   return res.json(result);
 });
 
-// 5. Database Sync Endpoints (PostgreSQL with Local Fallback)
+// 5. Authentication & Session Management (Production Architecture)
+const JWT_SECRET = process.env.JWT_SECRET || "lpgportal_jwt_secret_2026_super_secure";
+
+// Helper function to parse cookies manually
+function parseCookies(cookieHeader: string | undefined): Record<string, string> {
+  const list: Record<string, string> = {};
+  if (!cookieHeader) return list;
+  cookieHeader.split(";").forEach((cookie) => {
+    const parts = cookie.split("=");
+    list[parts.shift()!.trim()] = decodeURIComponent(parts.join("="));
+  });
+  return list;
+}
+
+// Login failure tracker for brute force prevention (IP and User/Email based)
+const loginFailures = new Map<string, { count: number; lockoutUntil: number }>();
+
+function getFailureRecord(key: string) {
+  const record = loginFailures.get(key);
+  const now = Date.now();
+  if (!record) {
+    return { count: 0, lockoutUntil: 0 };
+  }
+  if (now > record.lockoutUntil) {
+    return { count: 0, lockoutUntil: 0 };
+  }
+  return record;
+}
+
+function registerLoginFailure(key: string) {
+  const record = getFailureRecord(key);
+  const newCount = record.count + 1;
+  const lockoutUntil = newCount >= 5 ? Date.now() + 5 * 60 * 1000 : 0;
+  loginFailures.set(key, { count: newCount, lockoutUntil });
+  return { count: newCount, lockoutUntil };
+}
+
+function clearLoginFailures(key: string) {
+  loginFailures.delete(key);
+}
+
+// POST /api/auth/login with brute-force rate limiting and HttpOnly cookie generation
+app.post("/api/auth/login", express.json(), async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: "E-posta ve şifre gereklidir." });
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+  const ipKey = `ip:${req.ip}`;
+  const emailKey = `email:${normalizedEmail}`;
+
+  const now = Date.now();
+  const ipRecord = getFailureRecord(ipKey);
+  const emailRecord = getFailureRecord(emailKey);
+
+  if (ipRecord.lockoutUntil > now) {
+    const minutesLeft = Math.ceil((ipRecord.lockoutUntil - now) / 60000);
+    return res.status(429).json({ error: `Çok fazla başarısız deneme yapıldı. Lütfen ${minutesLeft} dakika sonra tekrar deneyin.` });
+  }
+  if (emailRecord.lockoutUntil > now) {
+    const minutesLeft = Math.ceil((emailRecord.lockoutUntil - now) / 60000);
+    return res.status(429).json({ error: `Bu hesap geçici olarak kilitlendi. Lütfen ${minutesLeft} dakika sonra tekrar deneyin.` });
+  }
+
+  try {
+    let foundUser: any = null;
+
+    if (useFallback) {
+      const db = readFallbackDb();
+      const users = db["lpgportal_users"] || [];
+      foundUser = users.find((u: any) => u.email.toLowerCase().trim() === normalizedEmail);
+    } else {
+      foundUser = await prisma.user.findUnique({
+        where: { email: normalizedEmail }
+      });
+    }
+
+    if (!foundUser) {
+      registerLoginFailure(ipKey);
+      return res.status(401).json({ error: "E-posta adresi veya şifre hatalı." });
+    }
+
+    // Verify password on the server
+    const isPasswordValid = verifyPassword(password, foundUser.email, foundUser.password);
+    if (!isPasswordValid) {
+      const ipRes = registerLoginFailure(ipKey);
+      const emailRes = registerLoginFailure(emailKey);
+      const maxCount = Math.max(ipRes.count, emailRes.count);
+      const remains = 5 - maxCount;
+
+      if (maxCount >= 5) {
+        return res.status(429).json({ error: "Çok fazla başarısız giriş denemesi yapıldı. Hesabınız 5 dakika süreyle bloke edilmiştir." });
+      } else {
+        return res.status(401).json({ error: `Girdiğiniz şifre hatalı. Kalan deneme hakkınız: ${remains}` });
+      }
+    }
+
+    // Clear failures on successful login
+    clearLoginFailures(ipKey);
+    clearLoginFailures(emailKey);
+
+    // Generate unique active session ID
+    const newSessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+
+    // Update activeSessionId in PostgreSQL or Fallback DB
+    if (useFallback) {
+      const db = readFallbackDb();
+      const users = db["lpgportal_users"] || [];
+      const idx = users.findIndex((u: any) => u.id === foundUser.id);
+      if (idx > -1) {
+        users[idx].active_session_id = newSessionId;
+        users[idx].last_login_time = new Date().toISOString();
+        users[idx].last_login_ip = req.ip;
+        users[idx].last_login_device = req.headers["user-agent"] || "Unknown";
+      }
+      writeFallbackDb(db);
+    } else {
+      await prisma.user.update({
+        where: { id: foundUser.id },
+        data: {
+          activeSessionId: newSessionId,
+          lastLoginTime: new Date(),
+          lastLoginIp: req.ip,
+          lastLoginDevice: req.headers["user-agent"] || "Unknown"
+        }
+      });
+    }
+
+    // Generate signed JWT token
+    const token = jwt.sign(
+      {
+        userId: foundUser.id,
+        email: foundUser.email,
+        role: foundUser.role,
+        sessionId: newSessionId
+      },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // Cookie configuration - local dev environment vs production
+    const isLocalhost = req.headers.host?.includes("localhost") || req.headers.host?.includes("127.0.0.1");
+    const cookieDomain = isLocalhost ? "" : "; Domain=lpgportal.com";
+
+    res.setHeader(
+      "Set-Cookie",
+      `lpgportal_session_token=${token}; HttpOnly; Secure; SameSite=Lax; Path=/${cookieDomain}; Max-Age=${7 * 24 * 60 * 60}`
+    );
+
+    return res.json({
+      success: true,
+      user: {
+        id: foundUser.id,
+        name: foundUser.name,
+        email: foundUser.email,
+        phone: foundUser.phone,
+        role: foundUser.role,
+        membership_type: foundUser.membershipType || foundUser.membership_type || "Ziyaretçi",
+        membership_status: foundUser.membershipStatus || foundUser.membership_status || "Aktif",
+        company_name: foundUser.companyName || foundUser.company_name
+      }
+    });
+
+  } catch (err: any) {
+    console.error("Login route error:", err);
+    return res.status(500).json({ error: "Sunucu hatası. Giriş işlemi gerçekleştirilemedi." });
+  }
+});
+
+// POST /api/auth/logout - clears cookie and activeSessionId
+app.post("/api/auth/logout", async (req, res) => {
+  const cookies = parseCookies(req.headers.cookie);
+  const token = cookies.lpgportal_session_token;
+
+  if (token) {
+    try {
+      const decoded: any = jwt.verify(token, JWT_SECRET);
+      if (useFallback) {
+        const db = readFallbackDb();
+        const users = db["lpgportal_users"] || [];
+        const idx = users.findIndex((u: any) => u.id === decoded.userId);
+        if (idx > -1) {
+          users[idx].active_session_id = null;
+        }
+        writeFallbackDb(db);
+      } else {
+        await prisma.user.update({
+          where: { id: decoded.userId },
+          data: { activeSessionId: null }
+        });
+      }
+    } catch (e) {
+      // Ignore token verification errors on logout
+    }
+  }
+
+  const isLocalhost = req.headers.host?.includes("localhost") || req.headers.host?.includes("127.0.0.1");
+  const cookieDomain = isLocalhost ? "" : "; Domain=lpgportal.com";
+
+  res.setHeader(
+    "Set-Cookie",
+    `lpgportal_session_token=; HttpOnly; Secure; SameSite=Lax; Path=/${cookieDomain}; Expires=Thu, 01 Jan 1970 00:00:00 GMT`
+  );
+
+  return res.json({ success: true });
+});
+
+// GET /api/auth/session - returns logged-in user profile from signed cookie
+app.get("/api/auth/session", async (req, res) => {
+  const cookies = parseCookies(req.headers.cookie);
+  const token = cookies.lpgportal_session_token;
+
+  if (!token) {
+    return res.status(401).json({ error: "Oturum bulunamadı. Lütfen giriş yapın." });
+  }
+
+  try {
+    const decoded: any = jwt.verify(token, JWT_SECRET);
+
+    let user: any = null;
+    if (useFallback) {
+      const db = readFallbackDb();
+      const users = db["lpgportal_users"] || [];
+      user = users.find((u: any) => u.id === decoded.userId);
+    } else {
+      user = await prisma.user.findUnique({
+        where: { id: decoded.userId }
+      });
+    }
+
+    if (!user) {
+      return res.status(401).json({ error: "Kullanıcı bulunamadı." });
+    }
+
+    const dbSessionId = useFallback ? user.active_session_id : user.activeSessionId;
+
+    if (dbSessionId !== decoded.sessionId) {
+      return res.status(401).json({ error: "Oturum başka bir cihazdan açıldığı için sonlandırıldı." });
+    }
+
+    return res.json({
+      authenticated: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        membership_type: user.membershipType || user.membership_type || "Ziyaretçi",
+        membership_status: user.membershipStatus || user.membership_status || "Aktif",
+        company_name: user.companyName || user.company_name,
+        active_session_id: dbSessionId
+      }
+    });
+
+  } catch (err) {
+    return res.status(401).json({ error: "Geçersiz oturum." });
+  }
+});
+
+// GET /api/auth/session/:userId - returns target activeSessionId (secured with requesting user cookie validation)
 app.get("/api/auth/session/:userId", async (req, res) => {
   const { userId } = req.params;
+  const cookies = parseCookies(req.headers.cookie);
+  const token = cookies.lpgportal_session_token;
+
+  if (!token) {
+    return res.status(401).json({ error: "Oturum bulunamadı." });
+  }
+
   try {
+    const decoded: any = jwt.verify(token, JWT_SECRET);
+    if (decoded.userId !== userId && decoded.role !== "admin") {
+      return res.status(403).json({ error: "Yetkisiz işlem." });
+    }
+
     if (useFallback) {
       if (process.env.NODE_ENV === "production") {
         return res.status(500).json({ error: "Veritabanı bağlantısı kurulamadı. Lütfen daha sonra tekrar deneyiniz." });
@@ -2189,12 +2464,10 @@ app.get("/api/auth/session/:userId", async (req, res) => {
       return res.json({ active_session_id: user?.activeSessionId || null });
     }
   } catch (err: any) {
-    if (process.env.NODE_ENV === "production") {
-      return res.status(500).json({ error: "Veritabanı bağlantısı kurulamadı. Lütfen daha sonra tekrar deneyiniz." });
-    }
-    return res.status(500).json({ error: err.message });
+    return res.status(401).json({ error: "Oturum doğrulanamadı." });
   }
 });
+
 
 app.get("/api/db/get-all", async (req, res) => {
   const clientVersion = req.query.v;
@@ -2208,9 +2481,10 @@ app.get("/api/db/get-all", async (req, res) => {
         return res.status(500).json({ error: "Veritabanı bağlantısı kurulamadı. Lütfen daha sonra tekrar deneyiniz." });
       }
       const data = readFallbackDb();
+      delete data.lpgportal_active_user;
+      delete data.lpgportal_active_user_sig;
       return res.json(data);
     }
-
     // Fetch from all Prisma tables
     const users = await prisma.user.findMany();
     const invoices = await prisma.invoice.findMany();
@@ -2222,14 +2496,13 @@ app.get("/api/db/get-all", async (req, res) => {
     const notifications = await prisma.notification.findMany();
     const expertProfiles = await prisma.expertProfile.findMany();
     const homeReviews = await prisma.homeReview.findMany();
-
     // Map DB objects back to frontend format
     const mappedUsers = users.map(u => ({
       id: u.id,
       name: u.name,
       email: u.email,
       phone: u.phone,
-      password: u.password,
+      password: "",
       role: u.role,
       membership_type: u.membershipType,
       membership_fee: u.membershipFee,
@@ -2256,7 +2529,7 @@ app.get("/api/db/get-all", async (req, res) => {
       logo_url: u.logoUrl,
       no_logo: u.noLogo,
       logo_type: u.logoType,
-      active_session_id: u.activeSessionId,
+      active_session_id: null,
       last_login_time: u.lastLoginTime?.toISOString(),
       last_login_ip: u.lastLoginIp,
       last_login_device: u.lastLoginDevice
@@ -2443,8 +2716,10 @@ app.get("/api/db/get-all", async (req, res) => {
       createdAt: h.createdAt.toISOString(),
       updatedAt: h.updatedAt.toISOString()
     }));
-
     const fallbackDb = readFallbackDb();
+    delete fallbackDb.lpgportal_active_user;
+    delete fallbackDb.lpgportal_active_user_sig;
+
     const fullDb = {
       ...fallbackDb,
       lpgportal_users: mappedUsers,
@@ -2467,6 +2742,8 @@ app.get("/api/db/get-all", async (req, res) => {
     }
     try {
       const data = readFallbackDb();
+      delete data.lpgportal_active_user;
+      delete data.lpgportal_active_user_sig;
       return res.json(data);
     } catch (e: any) {
       return res.status(500).json({ error: err.message });
