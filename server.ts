@@ -2356,7 +2356,8 @@ app.post("/api/auth/login", express.json(), async (req, res) => {
         role: foundUser.role,
         membership_type: foundUser.membershipType || foundUser.membership_type || "Ziyaretçi",
         membership_status: foundUser.membershipStatus || foundUser.membership_status || "Aktif",
-        company_name: foundUser.companyName || foundUser.company_name
+        company_name: foundUser.companyName || foundUser.company_name,
+        active_session_id: newSessionId
       }
     });
 
