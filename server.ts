@@ -3565,6 +3565,52 @@ app.get("/api/qa/verify-db", async (req, res) => {
   }
 });
 
+// QA Database User Activate API (Staging/QA only)
+app.post("/api/qa/activate", express.json(), async (req, res) => {
+  if (process.env.NODE_ENV === "production" && process.env.ENABLE_QA_ENDPOINTS !== "true") {
+    return res.status(404).json({ error: "Not Found" });
+  }
+
+  const qaSecret = req.headers["x-lpgportal-qa-secret"];
+  if (qaSecret !== "lpgportal_qa_secret_key_2026_secure") {
+    return res.status(403).json({ error: "Access denied: Invalid QA secret key" });
+  }
+
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  try {
+    const normalized = email.toLowerCase().trim();
+    if (useFallback) {
+      const db = readFallbackDb();
+      const users = db["lpgportal_users"] || [];
+      const user = users.find((u: any) => u.email.toLowerCase().trim() === normalized);
+      if (user) {
+        user.membership_status = "Aktif";
+        writeFallbackDb(db);
+        return res.json({ success: true, message: `Activated user ${normalized} in fallback DB.` });
+      }
+      return res.status(444).json({ error: "User not found in fallback DB" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: normalized } });
+    if (!user) {
+      return res.status(444).json({ error: "User not found in PostgreSQL" });
+    }
+
+    await prisma.user.update({
+      where: { email: normalized },
+      data: { membershipStatus: "Aktif" }
+    });
+
+    return res.json({ success: true, message: `Activated user ${normalized} in PostgreSQL.` });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // QA Database Cleanup API (Staging/QA only)
 app.post("/api/qa/cleanup", express.json(), async (req, res) => {
   if (process.env.NODE_ENV === "production" && process.env.ENABLE_QA_ENDPOINTS !== "true") {
