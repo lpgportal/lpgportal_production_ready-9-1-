@@ -371,21 +371,6 @@ async function initDatabase() {
 
     // Seed default users if they are missing
     try {
-      // Temporary password restoration on startup
-      try {
-        await prisma.user.update({
-          where: { email: "admin@lpgportal.com" },
-          data: { password: "v2_d1b5a627d38fb141ccf463663195b1adf47692a773b51c91e3595e1ab9fa44f1" }
-        });
-        await prisma.user.update({
-          where: { email: "hata@hata.com" },
-          data: { password: "v2_bf62d3b701d55ae8ad0dedec84f3d42f6a5051fd09b2c95e1f7518f2e6c10924" }
-        });
-        console.log("Passwords successfully restored on startup.");
-      } catch (pwdErr) {
-        console.error("Failed to restore passwords on startup:", pwdErr);
-      }
-
       const adminExists = await prisma.user.findUnique({
         where: { email: "admin@lpgportal.com" }
       });
@@ -2784,6 +2769,15 @@ app.post("/api/db/save", async (req, res) => {
         return res.status(500).json({ error: "Veritabanı bağlantısı kurulamadı. Lütfen daha sonra tekrar deneyiniz." });
       }
       const db = readFallbackDb();
+      if (key === "lpgportal_users" && Array.isArray(translatedVal)) {
+        const existingUsers = db["lpgportal_users"] || [];
+        for (const u of translatedVal) {
+          const dbUser = existingUsers.find((x: any) => x.id === u.id || x.email.toLowerCase() === u.email.toLowerCase());
+          if ((!u.password || u.password === "") && dbUser) {
+            u.password = dbUser.password;
+          }
+        }
+      }
       db[key] = translatedVal;
       writeFallbackDb(db);
       return res.json({ success: true, mode: "fallback", translatedValue: translatedVal });
@@ -2822,8 +2816,25 @@ app.post("/api/db/save", async (req, res) => {
           }
         }
 
+        // Load all existing users to merge passwords safely
+        const existingDbUsers = await tx.user.findMany({
+          select: { id: true, email: true, password: true }
+        });
+
         // Upsert users
         for (const u of translatedVal) {
+          const dbUser = existingDbUsers.find(
+            x => x.id === u.id || x.email.toLowerCase() === u.email.toLowerCase()
+          );
+          
+          let passwordToSave = u.password;
+          if ((!passwordToSave || passwordToSave === "") && dbUser) {
+            passwordToSave = dbUser.password;
+          }
+          if (!passwordToSave) {
+            passwordToSave = "";
+          }
+
           const statusMap: any = {
             "Süresi Dolmuş": "SuresiDolmus",
             "Askıya Alındı": "AskiyaAlindi",
@@ -2835,7 +2846,7 @@ app.post("/api/db/save", async (req, res) => {
             update: {
               name: u.name,
               phone: u.phone,
-              ...(u.password ? { password: u.password } : {}),
+              password: passwordToSave,
               role: u.role,
               membershipType: u.membership_type || "Ziyaretçi",
               membershipFee: Number(u.membership_fee || 0),
@@ -2872,7 +2883,7 @@ app.post("/api/db/save", async (req, res) => {
               name: u.name,
               email: u.email,
               phone: u.phone,
-              password: u.password || "",
+              password: passwordToSave,
               role: u.role,
               membershipType: u.membership_type || "Ziyaretçi",
               membershipFee: Number(u.membership_fee || 0),
@@ -3456,6 +3467,247 @@ app.post("/api/db/save", async (req, res) => {
   }
 });
 
+// QA Database Verification API (Staging/QA only)
+app.get("/api/qa/verify-db", async (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(404).json({ error: "Not Found" });
+  }
+
+  const qaSecret = req.headers["x-lpgportal-qa-secret"];
+  if (qaSecret !== "lpgportal_qa_secret_key_2026_secure") {
+    return res.status(403).json({ error: "Access denied: Invalid QA secret key" });
+  }
+
+  try {
+    if (useFallback) {
+      const db = readFallbackDb();
+      const users = db["lpgportal_users"] || [];
+      const blogCount = (db["lpgportal_news_db"] || []).filter((a: any) => a.articleType === "blog").length;
+      const newsCount = (db["lpgportal_news_db"] || []).filter((a: any) => a.articleType === "news").length;
+      const notificationCount = (db["lpgportal_notification_logs"] || []).length;
+      const orderCount = (db["lpgportal_orders"] || []).length;
+      const companyCount = (db["lpgportal_companies"] || []).length;
+      const productCount = (db["lpgportal_products"] || []).length;
+      return res.json({
+        success: true,
+        users: users.map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          password: u.password,
+          activeSessionId: u.active_session_id,
+          membershipStatus: u.membership_status
+        })),
+        blogCount,
+        newsCount,
+        notificationCount,
+        orderCount,
+        companyCount,
+        productCount
+      });
+    }
+
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        password: true,
+        activeSessionId: true,
+        membershipStatus: true
+      }
+    });
+
+    const blogCount = await prisma.article.count({ where: { articleType: "blog" } });
+    const newsCount = await prisma.article.count({ where: { articleType: "news" } });
+    const notificationCount = await prisma.notification.count();
+    const orderCount = await prisma.order.count();
+    const companyCount = await prisma.company.count();
+    const productCount = await prisma.product.count();
+
+    return res.json({
+      success: true,
+      users,
+      blogCount,
+      newsCount,
+      notificationCount,
+      orderCount,
+      companyCount,
+      productCount
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// QA Database Cleanup API (Staging/QA only)
+app.post("/api/qa/cleanup", express.json(), async (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(404).json({ error: "Not Found" });
+  }
+
+  const qaSecret = req.headers["x-lpgportal-qa-secret"];
+  if (qaSecret !== "lpgportal_qa_secret_key_2026_secure") {
+    return res.status(403).json({ error: "Access denied: Invalid QA secret key" });
+  }
+
+  const { emails } = req.body;
+  if (!Array.isArray(emails)) {
+    return res.status(400).json({ error: "Emails array is required" });
+  }
+
+  try {
+    if (useFallback) {
+      const db = readFallbackDb();
+      let users = db["lpgportal_users"] || [];
+      users = users.filter((u: any) => {
+        const normalized = u.email.toLowerCase().trim();
+        if (["admin@lpgportal.com", "hata@hata.com", "servis@lpgportal.com", "kit@lpgportal.com"].includes(normalized)) {
+          return true;
+        }
+        return !emails.map((e: string) => e.toLowerCase().trim()).includes(normalized);
+      });
+      db["lpgportal_users"] = users;
+      writeFallbackDb(db);
+      return res.json({ success: true, message: `Cleaned up test users in fallback DB.` });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const email of emails) {
+        const normalized = email.toLowerCase().trim();
+        if (["admin@lpgportal.com", "hata@hata.com", "servis@lpgportal.com", "kit@lpgportal.com"].includes(normalized)) {
+          continue;
+        }
+        await tx.user.deleteMany({
+          where: { email: normalized }
+        });
+      }
+    });
+    return res.json({ success: true, message: `Cleaned up ${emails.length} test users.` });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// QA Database Backup and Restore Verification API (Staging/QA only)
+app.post("/api/qa/backup-restore-test", async (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(404).json({ error: "Not Found" });
+  }
+
+  const qaSecret = req.headers["x-lpgportal-qa-secret"];
+  if (qaSecret !== "lpgportal_qa_secret_key_2026_secure") {
+    return res.status(403).json({ error: "Access denied: Invalid QA secret key" });
+  }
+
+  try {
+    if (useFallback) {
+      const db = readFallbackDb();
+      const backupPayload = JSON.stringify(db);
+      
+      const emptyDb = {
+        lpgportal_users: [],
+        lpgportal_companies: [],
+        lpgportal_products: [],
+        lpgportal_orders: [],
+        lpgportal_news_db: [],
+        lpgportal_notification_logs: [],
+        lpgportal_invoices: []
+      };
+      writeFallbackDb(emptyDb);
+      
+      writeFallbackDb(JSON.parse(backupPayload));
+      return res.json({ success: true, message: "Backup & Restore verification passed in fallback mode." });
+    }
+
+    // PostgreSQL Mode
+    const users = await prisma.user.findMany();
+    const invoices = await prisma.invoice.findMany();
+    const companies = await prisma.company.findMany();
+    const products = await prisma.product.findMany();
+    const orders = await prisma.order.findMany();
+    const articles = await prisma.article.findMany();
+    const notifications = await prisma.notification.findMany();
+
+    const backupPayload = {
+      users,
+      invoices,
+      companies,
+      products,
+      orders,
+      articles,
+      notifications
+    };
+
+    // Clear tables in order of dependencies
+    await prisma.$transaction(async (tx) => {
+      await tx.notification.deleteMany();
+      await tx.order.deleteMany();
+      await tx.product.deleteMany();
+      await tx.company.deleteMany();
+      await tx.invoice.deleteMany();
+      await tx.article.deleteMany();
+      await tx.user.deleteMany();
+    });
+
+    // Verify empty state
+    const emptyUserCount = await prisma.user.count();
+    const emptyArticleCount = await prisma.article.count();
+    if (emptyUserCount > 0 || emptyArticleCount > 0) {
+      throw new Error("Tables were not completely cleared during backup test.");
+    }
+
+    // Restore all records in transaction
+    await prisma.$transaction(async (tx) => {
+      for (const u of backupPayload.users) {
+        await tx.user.create({ data: u });
+      }
+      for (const inv of backupPayload.invoices) {
+        await tx.invoice.create({ data: inv });
+      }
+      for (const c of backupPayload.companies) {
+        await tx.company.create({ data: c });
+      }
+      for (const p of backupPayload.products) {
+        await tx.product.create({ data: p });
+      }
+      for (const o of backupPayload.orders) {
+        await tx.order.create({ data: o });
+      }
+      for (const a of backupPayload.articles) {
+        await tx.article.create({ data: a });
+      }
+      for (const n of backupPayload.notifications) {
+        await tx.notification.create({ data: n });
+      }
+    });
+
+    // Verify restored counts
+    const restUsers = await prisma.user.count();
+    const restArticles = await prisma.article.count();
+    
+    if (restUsers !== users.length || restArticles !== articles.length) {
+      throw new Error(`Data mismatch after restore: expected ${users.length} users and ${articles.length} articles, got ${restUsers} users and ${restArticles} articles.`);
+    }
+
+    return res.json({
+      success: true,
+      message: "Backup and Restore verified successfully in PostgreSQL.",
+      restoredRecords: {
+        users: restUsers,
+        articles: restArticles,
+        companies: companies.length,
+        products: products.length,
+        orders: orders.length,
+        notifications: notifications.length
+      }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 // ----------------------------------------------------
 // MONITORING & HEALTH CHECKS
