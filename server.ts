@@ -3613,6 +3613,63 @@ app.post("/api/qa/activate", express.json(), async (req, res) => {
   }
 });
 
+// QA Seed Load Test Users API (Staging/QA only)
+app.post("/api/qa/seed-load-test", express.json(), async (req, res) => {
+  if (process.env.NODE_ENV === "production" && process.env.ENABLE_QA_ENDPOINTS !== "true") {
+    return res.status(404).json({ error: "Not Found" });
+  }
+
+  const qaSecret = req.headers["x-lpgportal-qa-secret"];
+  if (qaSecret !== "lpgportal_qa_secret_key_2026_secure") {
+    return res.status(403).json({ error: "Access denied: Invalid QA secret key" });
+  }
+
+  const { count } = req.body;
+  const numUsers = count ? Number(count) : 100;
+
+  try {
+    const seededEmails: string[] = [];
+    const plainPassword = "LoadTestPassword2026!";
+    
+    const usersToCreate: any[] = [];
+    for (let i = 0; i < numUsers; i++) {
+      const email = `load_test_user_${i}_${Date.now()}@lpgportal.com`;
+      const saltEmail = email.toLowerCase().trim();
+      const hash = hashPassword(plainPassword, saltEmail);
+      
+      usersToCreate.push({
+        id: `user_load_test_${i}_${Date.now()}`,
+        name: `Load Test User ${i}`,
+        email: saltEmail,
+        phone: `5320000${String(i).padStart(3, '0')}`,
+        password: hash,
+        role: "vehicle_owner",
+        membershipType: "Araç Sahibi Yıllık Paket (Ücretsiz)",
+        membershipStatus: "Aktif",
+        kvkkApproved: true,
+        privacyPolicyApproved: true,
+        termsApproved: true,
+        marketingApproved: false
+      });
+      seededEmails.push(saltEmail);
+    }
+
+    if (useFallback) {
+      const db = readFallbackDb();
+      db["lpgportal_users"] = [...(db["lpgportal_users"] || []), ...usersToCreate];
+      writeFallbackDb(db);
+    } else {
+      await prisma.user.createMany({
+        data: usersToCreate
+      });
+    }
+
+    return res.json({ success: true, emails: seededEmails, password: plainPassword });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // QA Database Cleanup API (Staging/QA only)
 app.post("/api/qa/cleanup", express.json(), async (req, res) => {
   if (process.env.NODE_ENV === "production" && process.env.ENABLE_QA_ENDPOINTS !== "true") {
