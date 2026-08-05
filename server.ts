@@ -179,11 +179,13 @@ function readFallbackDb(): any {
   }
 }
 
-function writeFallbackDb(data: any) {
+function writeFallbackDb(data: any, shouldUpdateVersion: boolean = true) {
   try {
     fs.writeFileSync(FALLBACK_DB_PATH, JSON.stringify(data, null, 2), "utf8");
     fallbackDbCache = data;
-    dbVersion = Date.now().toString();
+    if (shouldUpdateVersion) {
+      dbVersion = Date.now().toString();
+    }
   } catch (e) {
     console.error("Error writing fallback JSON database:", e);
   }
@@ -2860,6 +2862,9 @@ app.post("/api/db/save", async (req, res) => {
     return res.status(400).json({ error: "Missing DB key." });
   }
 
+  const userRole = req.headers["x-lpgportal-user-role"] || req.headers["X-LpgPortal-User-Role"] || "visitor";
+  const shouldUpdateVersion = key !== "lpgportal_client_ip" && userRole !== "visitor";
+
   console.log("[DB SAVE] key:", key, "value:", JSON.stringify(value).substring(0, 150));
 
   // Optimistic Concurrency Control
@@ -2890,7 +2895,7 @@ app.post("/api/db/save", async (req, res) => {
         }
       }
       db[key] = translatedVal;
-      writeFallbackDb(db);
+      writeFallbackDb(db, shouldUpdateVersion);
       return res.json({ success: true, mode: "fallback", translatedValue: translatedVal });
     }
 
@@ -3597,7 +3602,7 @@ app.post("/api/db/save", async (req, res) => {
 
     const db = readFallbackDb();
     db[key] = translatedVal;
-    writeFallbackDb(db);
+    writeFallbackDb(db, shouldUpdateVersion);
 
     return res.json({ success: true, mode: "postgres", translatedValue: translatedVal });
   } catch (err: any) {
@@ -3609,7 +3614,7 @@ app.post("/api/db/save", async (req, res) => {
       const translatedVal = await processTranslationsForSave(key, value).catch(() => value);
       const db = readFallbackDb();
       db[key] = translatedVal;
-      writeFallbackDb(db);
+      writeFallbackDb(db, shouldUpdateVersion);
       return res.json({ success: true, mode: "fallback_error", translatedValue: translatedVal });
     } catch (e: any) {
       return res.status(500).json({ error: err.message });
