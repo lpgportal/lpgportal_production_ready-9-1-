@@ -43,15 +43,23 @@ export const lpgportalStorage = {
       }
 
       // Sync to database
+      const clientVersion = typeof window !== "undefined" ? (window as any).lpgportal_db_version : undefined;
       fetch("/api/db/save", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-LpgPortal-Secure": "true"
         },
-        body: JSON.stringify({ key, value: parsedValue })
+        body: JSON.stringify({ key, value: parsedValue, v: clientVersion })
       })
-        .then(res => res.json())
+        .then(async res => {
+          if (res.status === 409) {
+            window.alert("Veritabanı başka bir kullanıcı veya tarayıcı tarafından güncellendiği için işleminiz tamamlanamadı. Veri tutarlılığını sağlamak için sayfa yenilenecektir.");
+            window.location.reload();
+            throw new Error("Conflict");
+          }
+          return res.json();
+        })
         .then(resData => {
           if (resData && resData.translatedValue) {
             window.lpgportal_db[key] = JSON.stringify(resData.translatedValue);
@@ -63,7 +71,9 @@ export const lpgportalStorage = {
           }
         })
         .catch(err => {
-          console.error(`Failed to sync setItem for ${key} to DB:`, err);
+          if (err.message !== "Conflict") {
+            console.error(`Failed to sync setItem for ${key} to DB:`, err);
+          }
         });
       return;
     }
@@ -79,16 +89,24 @@ export const lpgportalStorage = {
     if (key.startsWith("lpgportal_") && !isSessionKey) {
       delete window.lpgportal_db[key];
 
+      const clientVersion = typeof window !== "undefined" ? (window as any).lpgportal_db_version : undefined;
       fetch("/api/db/save", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-LpgPortal-Secure": "true"
         },
-        body: JSON.stringify({ key, value: null })
-      }).catch(err => {
-        console.error(`Failed to sync removeItem for ${key} to DB:`, err);
-      });
+        body: JSON.stringify({ key, value: null, v: clientVersion })
+      })
+        .then(res => {
+          if (res.status === 409) {
+            window.alert("Veritabanı başka bir kullanıcı veya tarayıcı tarafından güncellendiği için işleminiz tamamlanamadı. Veri tutarlılığını sağlamak için sayfa yenilenecektir.");
+            window.location.reload();
+          }
+        })
+        .catch(err => {
+          console.error(`Failed to sync removeItem for ${key} to DB:`, err);
+        });
       return;
     }
 
