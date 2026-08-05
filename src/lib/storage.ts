@@ -58,6 +58,10 @@ export const lpgportalStorage = {
             window.location.reload();
             throw new Error("Conflict");
           }
+          const serverVersion = res.headers.get("X-LpgPortal-Version");
+          if (serverVersion) {
+            (window as any).lpgportal_db_version = serverVersion;
+          }
           return res.json();
         })
         .then(resData => {
@@ -102,6 +106,11 @@ export const lpgportalStorage = {
           if (res.status === 409) {
             window.alert("Veritabanı başka bir kullanıcı veya tarayıcı tarafından güncellendiği için işleminiz tamamlanamadı. Veri tutarlılığını sağlamak için sayfa yenilenecektir.");
             window.location.reload();
+            return;
+          }
+          const serverVersion = res.headers.get("X-LpgPortal-Version");
+          if (serverVersion) {
+            (window as any).lpgportal_db_version = serverVersion;
           }
         })
         .catch(err => {
