@@ -506,6 +506,34 @@ async function initDatabase() {
         console.error("Failed to recover seed users passwords in PostgreSQL:", recoverErr);
         logger.error("Failed to recover seed users passwords in PostgreSQL", { error: recoverErr.message });
       }
+
+      // Ensure deleted user placeholder is created in PostgreSQL
+      try {
+        const placeholderUser = await prisma.user.findUnique({
+          where: { id: "deleted_user_placeholder" }
+        });
+        if (!placeholderUser) {
+          console.log("Seeding system deleted user placeholder in PostgreSQL...");
+          await prisma.user.create({
+            data: {
+              id: "deleted_user_placeholder",
+              name: "Silinmiş Üye",
+              email: "deleted_user_placeholder@lpgportal.com",
+              phone: "0000000000",
+              password: "SYSTEM_DELETED_PLACEHOLDER_NO_LOGIN",
+              role: "visitor",
+              membershipType: "Ziyaretçi",
+              membershipFee: 0,
+              membershipEnd: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000), // 100 years
+              membershipStatus: "Pasif"
+            }
+          });
+        }
+      } catch (e: any) {
+        console.error("Failed to seed deleted user placeholder:", e);
+        logger.error("Failed to seed deleted user placeholder", { error: e.message });
+      }
+
     } catch (seedErr: any) {
       console.error("Failed to check/seed PostgreSQL users:", seedErr);
       logger.error("Failed to check/seed PostgreSQL users", { error: seedErr.message });
@@ -1601,9 +1629,6 @@ const verifyApiSession = (req: express.Request, res: express.Response, next: exp
       logger.warn("Unauthorized Role Access", { email, role, path: req.path, ip: req.ip });
       return res.status(403).json({ error: "Bu işlem için yetkiniz bulunmamaktadır." });
     }
-  }`[Auth Violation] Unauthorized access attempt to news generator by user ${email} (Role: ${role})`);
-      return res.status(403).json({ error: "Bu işlem için yetkiniz bulunmamaktadır." });
-    }
   }
 
   next();
@@ -2391,11 +2416,11 @@ app.post("/api/auth/login", express.json(), async (req, res) => {
 
     // Cookie configuration - local dev environment vs production
     const isLocalhost = req.headers.host?.includes("localhost") || req.headers.host?.includes("127.0.0.1");
-    const cookieDomain = isLocalhost ? "" : "; Domain=lpgportal.com";
+    const domainOption = isLocalhost ? "" : "; Domain=lpgportal.com";
 
     res.setHeader(
       "Set-Cookie",
-      `lpgportal_session_token=${token}; HttpOnly; Secure; SameSite=Lax; Path=/${cookieDomain}; Max-Age=${7 * 24 * 60 * 60}`
+      `lpgportal_session_token=${token}; HttpOnly; Secure; SameSite=Lax; Path=/${domainOption}; Max-Age=${7 * 24 * 60 * 60}`
     );
 
     return res.json({
@@ -2447,11 +2472,11 @@ app.post("/api/auth/logout", async (req, res) => {
   }
 
   const isLocalhost = req.headers.host?.includes("localhost") || req.headers.host?.includes("127.0.0.1");
-  const cookieDomain = isLocalhost ? "" : "; Domain=lpgportal.com";
+  const domainOption = isLocalhost ? "" : "; Domain=lpgportal.com";
 
   res.setHeader(
     "Set-Cookie",
-    `lpgportal_session_token=; HttpOnly; Secure; SameSite=Lax; Path=/${cookieDomain}; Expires=Thu, 01 Jan 1970 00:00:00 GMT`
+    `lpgportal_session_token=; HttpOnly; Secure; SameSite=Lax; Path=/${domainOption}; Expires=Thu, 01 Jan 1970 00:00:00 GMT`
   );
 
   return res.json({ success: true });
@@ -2830,12 +2855,21 @@ app.get("/api/db/get-all", async (req, res) => {
 });
 
 app.post("/api/db/save", async (req, res) => {
-  const { key, value } = req.body;
+  const { key, value, v: clientVersion } = req.body;
   if (!key) {
     return res.status(400).json({ error: "Missing DB key." });
   }
 
   console.log("[DB SAVE] key:", key, "value:", JSON.stringify(value).substring(0, 150));
+
+  // Optimistic Concurrency Control
+  if (clientVersion && clientVersion !== dbVersion) {
+    console.warn(`[DB SAVE CONFLICT] Client version: ${clientVersion}, Server version: ${dbVersion}`);
+    return res.status(409).json({
+      error: "Conflict",
+      message: "Veritabanı başka bir kullanıcı tarafından güncellenmiş. Lütfen sayfayı yenileyip tekrar deneyin."
+    });
+  }
 
   try {
     const translatedVal = await processTranslationsForSave(key, value);
@@ -2892,9 +2926,9 @@ app.post("/api/db/save", async (req, res) => {
           }
         }
 
-        // Load all existing users to merge passwords safely
+        // Load all existing users to merge passwords and protect activeSessionId safely
         const existingDbUsers = await tx.user.findMany({
-          select: { id: true, email: true, password: true }
+          select: { id: true, email: true, password: true, activeSessionId: true }
         });
 
         // Upsert users
@@ -2909,6 +2943,12 @@ app.post("/api/db/save", async (req, res) => {
           }
           if (!passwordToSave) {
             passwordToSave = "";
+          }
+
+          // Secure activeSessionId from CRUD updates
+          let sessionToSave = u.active_session_id;
+          if (dbUser) {
+            sessionToSave = dbUser.activeSessionId; // Preserve DB session
           }
 
           const statusMap: any = {
@@ -2949,7 +2989,7 @@ app.post("/api/db/save", async (req, res) => {
               logoUrl: u.logo_url,
               noLogo: !!u.no_logo,
               logoType: u.logo_type || "auto",
-              activeSessionId: u.active_session_id,
+              activeSessionId: sessionToSave,
               lastLoginTime: u.last_login_time ? new Date(u.last_login_time) : null,
               lastLoginIp: u.last_login_ip,
               lastLoginDevice: u.last_login_device
@@ -2986,7 +3026,7 @@ app.post("/api/db/save", async (req, res) => {
               logoUrl: u.logo_url,
               noLogo: !!u.no_logo,
               logoType: u.logo_type || "auto",
-              activeSessionId: u.active_session_id,
+              activeSessionId: sessionToSave,
               lastLoginTime: u.last_login_time ? new Date(u.last_login_time) : null,
               lastLoginIp: u.last_login_ip,
               lastLoginDevice: u.last_login_device
@@ -2997,17 +3037,50 @@ app.post("/api/db/save", async (req, res) => {
         // Targeted delete users not present in the incoming array (protecting admins)
         const incomingIds = translatedVal.map((x: any) => x.id);
         const existingUsers = await tx.user.findMany({ select: { id: true, role: true, email: true } });
-        const existingIds = existingUsers.filter(u => u.role !== "admin").map(u => u.id);
+        const existingIds = existingUsers.filter(u => u.role !== "admin" && u.id !== "deleted_user_placeholder").map(u => u.id);
         const toDelete = existingIds.filter(id => !incomingIds.includes(id));
         if (incomingIds.length > 2) {
           for (const id of toDelete) {
             const userObj = existingUsers.find(x => x.id === id);
+            
+            // Relational safety manual cascade updates: Re-assign invoices to deleted_user_placeholder
+            await tx.invoice.updateMany({
+              where: { userId: id },
+              data: { userId: "deleted_user_placeholder" }
+            });
+
+            // Nullify support tickets, company owners, sms/email logs
+            await tx.supportTicket.updateMany({
+              where: { creatorId: id },
+              data: { creatorId: "deleted_user_placeholder" }
+            });
+            await tx.smsLog.updateMany({
+              where: { userId: id },
+              data: { userId: "deleted_user_placeholder" }
+            });
+            await tx.emailLog.updateMany({
+              where: { userId: id },
+              data: { userId: "deleted_user_placeholder" }
+            });
+            await tx.company.updateMany({
+              where: { ownerId: id },
+              data: { ownerId: null }
+            });
+
+            // Cascade delete dependent records
+            await tx.product.deleteMany({ where: { sellerId: id } });
+            await tx.order.deleteMany({ where: { OR: [ { buyerId: id }, { sellerId: id } ] } });
+            await tx.expertProfile.deleteMany({ where: { userId: id } });
+            await tx.payment.deleteMany({ where: { userId: id } });
+
+            // Delete user safely
             await tx.user.delete({ where: { id } });
+            
             await tx.auditLog.create({
               data: {
                 actor: "API Sync",
                 action: "USER_DELETE",
-                details: `Deleted user ${userObj ? userObj.email : id}`,
+                details: `Deleted user ${userObj ? userObj.email : id} safely and reassigned invoices`,
                 ipAddress: req.ip
               }
             });
