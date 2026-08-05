@@ -2863,7 +2863,7 @@ app.post("/api/db/save", async (req, res) => {
   console.log("[DB SAVE] key:", key, "value:", JSON.stringify(value).substring(0, 150));
 
   // Optimistic Concurrency Control
-  if (clientVersion && clientVersion !== dbVersion) {
+  if (key !== "lpgportal_client_ip" && clientVersion && clientVersion !== dbVersion) {
     console.warn(`[DB SAVE CONFLICT] Client version: ${clientVersion}, Server version: ${dbVersion}`);
     return res.status(409).json({
       error: "Conflict",
@@ -2872,6 +2872,7 @@ app.post("/api/db/save", async (req, res) => {
   }
 
   try {
+    res.setHeader("X-LpgPortal-Version", dbVersion);
     const translatedVal = await processTranslationsForSave(key, value);
 
     if (useFallback) {
