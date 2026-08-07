@@ -635,10 +635,11 @@ export default function App() {
           }
         });
         
-        // Safety check if user logged out while request was in flight
-        if (!activeUser) return;
+        // Safety check: if session was explicitly cleared/logged out, exit early
+        if (!sessionStorage.getItem("lpgportal_session_id")) return;
 
         if (res.status === 401) {
+          if (!sessionStorage.getItem("lpgportal_session_id")) return;
           handleLogout();
           localStorage.setItem("lpgportal_session_terminated", "true");
           setShowSessionTerminatedModal(true);
@@ -652,6 +653,7 @@ export default function App() {
         if (!serverSessionId) return;
         
         if (serverSessionId !== localSessionId) {
+          if (!sessionStorage.getItem("lpgportal_session_id")) return;
           handleLogout();
           localStorage.setItem("lpgportal_session_terminated", "true");
           setShowSessionTerminatedModal(true);
