@@ -49,6 +49,22 @@ interface NewsAndBulletinsCenterProps {
   } | null;
 }
 
+const getAvailableCategoriesForRole = (role?: string) => {
+  if (role === "admin") {
+    return ["Haber", "Blog Yazısı", "Teknik Bülten", "Podcast", "Eğitim İçeriği", "Yazılım ve Kalibrasyon Kütüphanesi Kaydı"];
+  }
+  if (role === "manufacturer") {
+    return ["Teknik Bülten", "Eğitim İçeriği", "Yazılım ve Kalibrasyon Kütüphanesi Kaydı", "Haber"]; // bulletins, training, software library, announcements
+  }
+  if (role === "dealer") {
+    return ["Haber", "Blog Yazısı"]; // News, blog
+  }
+  if (role === "engineer") {
+    return ["Blog Yazısı"]; // Technical article
+  }
+  return []; // vehicle_owner and visitor can't publish anything
+};
+
 export default function NewsAndBulletinsCenter({ activeUser }: NewsAndBulletinsCenterProps = {}) {
   const { language, t, translateEntity } = useLanguage();
 
@@ -326,8 +342,9 @@ export default function NewsAndBulletinsCenter({ activeUser }: NewsAndBulletinsC
       return;
     }
 
-    // Direct access or system security hole check for "Teknik Bülten"
-    if (newCategory === "Teknik Bülten" && activeUser?.role !== "manufacturer" && activeUser?.role !== "admin") {
+    // Dynamic Role-based category verification
+    const allowedCats = getAvailableCategoriesForRole(activeUser?.role);
+    if (!allowedCats.includes(newCategory)) {
       alert("Bu kategori için içerik oluşturma yetkiniz bulunmamaktadır.");
       showToast("Bu kategori için içerik oluşturma yetkiniz bulunmamaktadır.");
       return;
@@ -346,7 +363,8 @@ export default function NewsAndBulletinsCenter({ activeUser }: NewsAndBulletinsC
       setUserContentsDb(prev => prev.map(item => {
         if (item.id === isEditingContentId) {
           // Extra validation on edit to prevent raw bypass
-          if (newCategory === "Teknik Bülten" && activeUser?.role !== "manufacturer" && activeUser?.role !== "admin") {
+          const allowedCats = getAvailableCategoriesForRole(activeUser?.role);
+          if (!allowedCats.includes(newCategory)) {
             alert("Bu kategori için içerik oluşturma yetkiniz bulunmamaktadır.");
             return item;
           }
@@ -1692,6 +1710,9 @@ export default function NewsAndBulletinsCenter({ activeUser }: NewsAndBulletinsC
     }
   };
 
+  const myContents = activeUser?.role === "admin" 
+    ? userContentsDb 
+    : userContentsDb.filter(c => c.authorEmail === activeUser?.email || c.authorId === activeUser?.email);
   const filteredNewsList = getFilteredNews();
   const filteredBulletinsList = getFilteredBulletins();
   const filteredLibraryList = getFilteredLibrary();
@@ -2074,18 +2095,17 @@ export default function NewsAndBulletinsCenter({ activeUser }: NewsAndBulletinsC
             type="button"
             onClick={() => {
               // Rule: Check role permission
-              const allowedRoles = ["admin", "vehicle_owner", "engineer", "dealer", "manufacturer"];
-              const userRole = activeUser?.role || "visitor";
-              if (!activeUser || !allowedRoles.includes(userRole)) {
-                showToast(tLocal("İçerik oluşturabilmek için aktif üyelik paketine sahip olmanız gerekmektedir.", "An active membership plan is required to publish or generate documents."));
-                alert(tLocal("İçerik oluşturabilmek için aktif üyelik paketine sahip olmanız gerekmektedir.", "An active membership plan is required to publish or generate documents."));
+              if (!activeUser || activeUser.role === "vehicle_owner" || activeUser.role === "visitor") {
+                showToast("Bu işlem için yetkiniz bulunmamaktadır.");
+                alert("Bu işlem için yetkiniz bulunmamaktadır.");
                 return;
               }
               
               // Reset edit states
               setIsEditingContentId(null);
               setNewTitle("");
-              setNewCategory("Haber");
+              const cats = getAvailableCategoriesForRole(activeUser?.role);
+              setNewCategory(cats[0] || "Haber");
               setNewSummary("");
               setNewContent("");
               setNewTags("");
@@ -2238,7 +2258,7 @@ export default function NewsAndBulletinsCenter({ activeUser }: NewsAndBulletinsC
                     onChange={(e) => setNewCategory(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:border-emerald-500 text-slate-800 cursor-pointer"
                   >
-                    {["Haber", "Blog Yazısı", "Teknik Bülten", "Podcast", "Eğitim İçeriği", "Yazılım ve Kalibrasyon Kütüphanesi Kaydı"].map(cat => (
+                    {getAvailableCategoriesForRole(activeUser?.role).map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
@@ -3844,7 +3864,8 @@ export default function NewsAndBulletinsCenter({ activeUser }: NewsAndBulletinsC
                   // Reset edit states
                   setIsEditingContentId(null);
                   setNewTitle("");
-                  setNewCategory("Haber");
+                  const cats = getAvailableCategoriesForRole(activeUser?.role);
+                  setNewCategory(cats[0] || "Haber");
                   setNewSummary("");
                   setNewContent("");
                   setNewTags("");
@@ -3983,12 +4004,12 @@ export default function NewsAndBulletinsCenter({ activeUser }: NewsAndBulletinsC
             <div className="lg:col-span-12 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <h4 className="font-extrabold text-sm text-slate-850 uppercase tracking-widest font-sans flex items-center gap-1.5">
-                  📁 Kaleme Aldığım İçerikler ({userContentsDb.length})
+                  📁 Kaleme Aldığım İçerikler ({myContents.length})
                 </h4>
                 <span className="text-[10px] text-slate-400 font-mono">Durable Storage Active</span>
               </div>
 
-              {userContentsDb.length === 0 ? (
+              {myContents.length === 0 ? (
                 <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-16 text-center text-slate-400">
                   <PenTool className="h-10 w-10 text-slate-300 mx-auto mb-3" />
                   <p className="font-extrabold text-sm">{tLocal("Henüz bir içerik yazısı eklemediniz.", "You haven't added any content posts yet.")}</p>
@@ -3996,7 +4017,7 @@ export default function NewsAndBulletinsCenter({ activeUser }: NewsAndBulletinsC
                 </div>
               ) : (
                 <div className="space-y-3.5">
-                  {userContentsDb.map((item) => {
+                  {myContents.map((item) => {
                     // Decide badge color
                     let badgeCol = "bg-amber-50 text-amber-700 border-amber-150";
                     if (item.status === "İnceleniyor") badgeCol = "bg-blue-50 text-blue-700 border-blue-150";
