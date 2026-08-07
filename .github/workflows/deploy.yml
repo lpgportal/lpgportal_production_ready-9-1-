@@ -11,4 +11,4 @@ jobs:
     steps:
       - name: Trigger Deploy Webhook
         run: |
-          curl -f -X GET "http://185.22.184.110:8000/api/v1/deploy?uuid=vhq882b09ccnc9umeug3o1xq"
+          curl -f -H "Authorization: Bearer 1|14BWFAKCPunjObSqhkZDqp3I7ZO65WbXVpWOsBuI8b7ddd49" -X GET "http://185.22.184.110:8000/api/v1/deploy?uuid=vhq882b09ccnc9umeug3o1xq"
