@@ -51,7 +51,7 @@ import {
   PlusCircle,
   Trash,
   Sparkles,
-  Eye,
+  Eye, EyeOff,
   ArrowLeft,
   Send,
   Paperclip,
@@ -259,6 +259,7 @@ export default function MembershipPortal({
   // Login form field states
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [authError, setAuthError] = useState("");
   const [authSuccess, setAuthSuccess] = useState("");
 
@@ -4661,12 +4662,23 @@ export default function MembershipPortal({
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                     <input 
-                      type="password" 
+                      type={showLoginPassword ? "text" : "password"} 
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full bg-slate-50 hover:bg-slate-100/60 focus:bg-white text-xs py-3 pl-10 pr-4 rounded-xl border border-slate-200 focus:border-emerald-500 focus:outline-none transition"
+                      className="w-full bg-slate-50 hover:bg-slate-100/60 focus:bg-white text-xs py-3 pl-10 pr-10 rounded-xl border border-slate-200 focus:border-emerald-500 focus:outline-none transition"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-slate-650 transition cursor-pointer"
+                    >
+                      {showLoginPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
                   </div>
                 </div>
 
@@ -8037,7 +8049,7 @@ export default function MembershipPortal({
                               : "bg-white border-slate-200 hover:bg-slate-50 text-slate-600 cursor-pointer"
                           }`}
                         >
-                          🎁 Ücretsiz Üyelik Kodları ({getFreePromoCodes().length})
+                          🎁 Ücretsiz Üyelik Kodları ({getFreePromoCodes().filter(c => !c.used).length})
                         </button>
                       </div>
                     </div>
@@ -12465,7 +12477,7 @@ export default function MembershipPortal({
                         <input 
                           type="checkbox" 
                           id="chk_marketing_profile"
-                          checked={activeUser.marketing_approved ?? false}
+                          checked={activeUser.marketing_approved ?? true}
                           onChange={(e) => {
                             const approved = e.target.checked;
                             const updatedUser: DbUser = { 
