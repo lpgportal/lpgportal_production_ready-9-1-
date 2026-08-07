@@ -1,0 +1,14 @@
+name: Trigger Coolify Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Deploy Webhook
+        run: |
+          curl -f -X GET "http://185.22.184.110:8000/api/v1/deploy?uuid=vhq882b09ccnc9umeug3o1xq"
