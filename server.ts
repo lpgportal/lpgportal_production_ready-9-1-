@@ -3699,6 +3699,39 @@ app.get("/api/qa/verify-db", async (req, res) => {
   }
 });
 
+app.get("/api/qa/diagnostics", async (req, res) => {
+  if (process.env.NODE_ENV === "production" && process.env.ENABLE_QA_ENDPOINTS !== "true") {
+    return res.status(404).json({ error: "Not Found" });
+  }
+
+  const qaSecret = req.headers["x-lpgportal-qa-secret"];
+  if (qaSecret !== "lpgportal_qa_secret_key_2026_secure") {
+    return res.status(403).json({ error: "Access denied: Invalid QA secret key" });
+  }
+
+  let prismaConnected = false;
+  let prismaError = "";
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    prismaConnected = true;
+  } catch (err: any) {
+    prismaError = err.message;
+  }
+
+  const dbUrl = process.env.DATABASE_URL || "";
+  const maskedDbUrl = dbUrl ? dbUrl.replace(/:[^@]+@/, ":****@") : "NOT_SET";
+
+  return res.json({
+    success: true,
+    useFallback,
+    prismaConnected,
+    prismaError,
+    maskedDbUrl,
+    nodeEnv: process.env.NODE_ENV,
+    enableQaEndpoints: process.env.ENABLE_QA_ENDPOINTS
+  });
+});
+
 // QA Database User Activate API (Staging/QA only)
 app.post("/api/qa/activate", express.json(), async (req, res) => {
   if (process.env.NODE_ENV === "production" && process.env.ENABLE_QA_ENDPOINTS !== "true") {
