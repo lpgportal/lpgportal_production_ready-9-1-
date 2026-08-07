@@ -2373,6 +2373,12 @@ app.post("/api/auth/login", express.json(), async (req, res) => {
       }
     }
 
+    // Check membership status (must be approved/Aktif to login)
+    const userStatus = foundUser.membershipStatus || foundUser.membership_status || "OnayBekliyor";
+    if (userStatus !== "Aktif") {
+      return res.status(403).json({ error: "Hesabınız henüz onaylanmamıştır veya pasif durumdadır." });
+    }
+
     // Clear failures on successful login
     clearLoginFailures(ipKey);
     clearLoginFailures(emailKey);
@@ -2590,17 +2596,30 @@ app.get("/api/db/get-all", async (req, res) => {
       delete data.lpgportal_active_user_sig;
       return res.json(data);
     }
-    // Fetch from all Prisma tables
-    const users = await prisma.user.findMany();
-    const invoices = await prisma.invoice.findMany();
-    const companies = await prisma.company.findMany();
-    const products = await prisma.product.findMany();
-    const orders = await prisma.order.findMany();
-    const articles = await prisma.article.findMany();
-    const bulletins = await prisma.bulletin.findMany();
-    const notifications = await prisma.notification.findMany();
-    const expertProfiles = await prisma.expertProfile.findMany();
-    const homeReviews = await prisma.homeReview.findMany();
+    // Fetch from all Prisma tables in parallel for optimal performance
+    const [
+      users,
+      invoices,
+      companies,
+      products,
+      orders,
+      articles,
+      bulletins,
+      notifications,
+      expertProfiles,
+      homeReviews
+    ] = await Promise.all([
+      prisma.user.findMany(),
+      prisma.invoice.findMany(),
+      prisma.company.findMany(),
+      prisma.product.findMany(),
+      prisma.order.findMany(),
+      prisma.article.findMany(),
+      prisma.bulletin.findMany(),
+      prisma.notification.findMany(),
+      prisma.expertProfile.findMany(),
+      prisma.homeReview.findMany()
+    ]);
     // Map DB objects back to frontend format
     const mappedUsers = users.map(u => ({
       id: u.id,
@@ -3045,52 +3064,50 @@ app.post("/api/db/save", async (req, res) => {
         const existingUsers = await tx.user.findMany({ select: { id: true, role: true, email: true } });
         const existingIds = existingUsers.filter(u => u.role !== "admin" && u.id !== "deleted_user_placeholder").map(u => u.id);
         const toDelete = existingIds.filter(id => !incomingIds.includes(id));
-        if (incomingIds.length > 2) {
-          for (const id of toDelete) {
-            const userObj = existingUsers.find(x => x.id === id);
-            
-            // Relational safety manual cascade updates: Re-assign invoices to deleted_user_placeholder
-            await tx.invoice.updateMany({
-              where: { userId: id },
-              data: { userId: "deleted_user_placeholder" }
-            });
+        for (const id of toDelete) {
+          const userObj = existingUsers.find(x => x.id === id);
+          
+          // Relational safety manual cascade updates: Re-assign invoices to deleted_user_placeholder
+          await tx.invoice.updateMany({
+            where: { userId: id },
+            data: { userId: "deleted_user_placeholder" }
+          });
 
-            // Nullify support tickets, company owners, sms/email logs
-            await tx.supportTicket.updateMany({
-              where: { creatorId: id },
-              data: { creatorId: "deleted_user_placeholder" }
-            });
-            await tx.smsLog.updateMany({
-              where: { userId: id },
-              data: { userId: "deleted_user_placeholder" }
-            });
-            await tx.emailLog.updateMany({
-              where: { userId: id },
-              data: { userId: "deleted_user_placeholder" }
-            });
-            await tx.company.updateMany({
-              where: { ownerId: id },
-              data: { ownerId: null }
-            });
+          // Nullify support tickets, company owners, sms/email logs
+          await tx.supportTicket.updateMany({
+            where: { creatorId: id },
+            data: { creatorId: "deleted_user_placeholder" }
+          });
+          await tx.smsLog.updateMany({
+            where: { userId: id },
+            data: { userId: "deleted_user_placeholder" }
+          });
+          await tx.emailLog.updateMany({
+            where: { userId: id },
+            data: { userId: "deleted_user_placeholder" }
+          });
+          await tx.company.updateMany({
+            where: { ownerId: id },
+            data: { ownerId: null }
+          });
 
-            // Cascade delete dependent records
-            await tx.product.deleteMany({ where: { sellerId: id } });
-            await tx.order.deleteMany({ where: { OR: [ { buyerId: id }, { sellerId: id } ] } });
-            await tx.expertProfile.deleteMany({ where: { userId: id } });
-            await tx.payment.deleteMany({ where: { userId: id } });
+          // Cascade delete dependent records
+          await tx.product.deleteMany({ where: { sellerId: id } });
+          await tx.order.deleteMany({ where: { OR: [ { buyerId: id }, { sellerId: id } ] } });
+          await tx.expertProfile.deleteMany({ where: { userId: id } });
+          await tx.payment.deleteMany({ where: { userId: id } });
 
-            // Delete user safely
-            await tx.user.delete({ where: { id } });
-            
-            await tx.auditLog.create({
-              data: {
-                actor: "API Sync",
-                action: "USER_DELETE",
-                details: `Deleted user ${userObj ? userObj.email : id} safely and reassigned invoices`,
-                ipAddress: req.ip
-              }
-            });
-          }
+          // Delete user safely
+          await tx.user.delete({ where: { id } });
+          
+          await tx.auditLog.create({
+            data: {
+              actor: "API Sync",
+              action: "USER_DELETE",
+              details: `Deleted user ${userObj ? userObj.email : id} safely and reassigned invoices`,
+              ipAddress: req.ip
+            }
+          });
         }
 
         // Audit Log for Upsert
@@ -3146,18 +3163,16 @@ app.post("/api/db/save", async (req, res) => {
         const incomingIds = translatedVal.map((x: any) => x.id);
         const existingItems = await tx.invoice.findMany({ select: { id: true } });
         const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
-        if (incomingIds.length > 0) {
-          for (const id of toDelete) {
-            await tx.invoice.delete({ where: { id } });
-            await tx.auditLog.create({
-              data: {
-                actor: "API Sync",
-                action: "INVOICE_DELETE",
-                details: `Deleted invoice ${id}`,
-                ipAddress: req.ip
-              }
-            });
-          }
+        for (const id of toDelete) {
+          await tx.invoice.delete({ where: { id } });
+          await tx.auditLog.create({
+            data: {
+              actor: "API Sync",
+              action: "INVOICE_DELETE",
+              details: `Deleted invoice ${id}`,
+              ipAddress: req.ip
+            }
+          });
         }
       }
 
@@ -3203,19 +3218,17 @@ app.post("/api/db/save", async (req, res) => {
         const incomingIds = translatedVal.map((x: any) => x.id);
         const existingItems = await tx.company.findMany({ select: { id: true, companyName: true } });
         const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
-        if (incomingIds.length > 0) {
-          for (const id of toDelete) {
-            const comp = existingItems.find(x => x.id === id);
-            await tx.company.delete({ where: { id } });
-            await tx.auditLog.create({
-              data: {
-                actor: "API Sync",
-                action: "COMPANY_DELETE",
-                details: `Deleted company ${comp ? comp.companyName : id}`,
-                ipAddress: req.ip
-              }
-            });
-          }
+        for (const id of toDelete) {
+          const comp = existingItems.find(x => x.id === id);
+          await tx.company.delete({ where: { id } });
+          await tx.auditLog.create({
+            data: {
+              actor: "API Sync",
+              action: "COMPANY_DELETE",
+              details: `Deleted company ${comp ? comp.companyName : id}`,
+              ipAddress: req.ip
+            }
+          });
         }
       }
 
@@ -3263,19 +3276,17 @@ app.post("/api/db/save", async (req, res) => {
         const incomingIds = translatedVal.map((x: any) => x.id);
         const existingItems = await tx.product.findMany({ select: { id: true, name: true } });
         const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
-        if (incomingIds.length > 0) {
-          for (const id of toDelete) {
-            const prod = existingItems.find(x => x.id === id);
-            await tx.product.delete({ where: { id } });
-            await tx.auditLog.create({
-              data: {
-                actor: "API Sync",
-                action: "PRODUCT_DELETE",
-                details: `Deleted product ${prod ? prod.name : id}`,
-                ipAddress: req.ip
-              }
-            });
-          }
+        for (const id of toDelete) {
+          const prod = existingItems.find(x => x.id === id);
+          await tx.product.delete({ where: { id } });
+          await tx.auditLog.create({
+            data: {
+              actor: "API Sync",
+              action: "PRODUCT_DELETE",
+              details: `Deleted product ${prod ? prod.name : id}`,
+              ipAddress: req.ip
+            }
+          });
         }
       }
 
@@ -3319,18 +3330,16 @@ app.post("/api/db/save", async (req, res) => {
         const incomingIds = translatedVal.map((x: any) => x.id);
         const existingItems = await tx.order.findMany({ select: { id: true } });
         const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
-        if (incomingIds.length > 0) {
-          for (const id of toDelete) {
-            await tx.order.delete({ where: { id } });
-            await tx.auditLog.create({
-              data: {
-                actor: "API Sync",
-                action: "ORDER_DELETE",
-                details: `Deleted order ${id}`,
-                ipAddress: req.ip
-              }
-            });
-          }
+        for (const id of toDelete) {
+          await tx.order.delete({ where: { id } });
+          await tx.auditLog.create({
+            data: {
+              actor: "API Sync",
+              action: "ORDER_DELETE",
+              details: `Deleted order ${id}`,
+              ipAddress: req.ip
+            }
+          });
         }
       }
 
@@ -3400,19 +3409,17 @@ app.post("/api/db/save", async (req, res) => {
           select: { id: true, title: true }
         });
         const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
-        if (incomingIds.length > 2) { // Safeguard against wiping seeded db
-          for (const id of toDelete) {
-            const art = existingItems.find(x => x.id === id);
-            await tx.article.delete({ where: { id } });
-            await tx.auditLog.create({
-              data: {
-                actor: "API Sync",
-                action: "ARTICLE_DELETE",
-                details: `Deleted article ${art ? art.title : id} (${articleType})`,
-                ipAddress: req.ip
-              }
-            });
-          }
+        for (const id of toDelete) {
+          const art = existingItems.find(x => x.id === id);
+          await tx.article.delete({ where: { id } });
+          await tx.auditLog.create({
+            data: {
+              actor: "API Sync",
+              action: "ARTICLE_DELETE",
+              details: `Deleted article ${art ? art.title : id} (${articleType})`,
+              ipAddress: req.ip
+            }
+          });
         }
       }
 
@@ -3480,19 +3487,17 @@ app.post("/api/db/save", async (req, res) => {
         const incomingIds = translatedVal.map((x: any) => x.id);
         const existingItems = await tx.bulletin.findMany({ select: { id: true, title: true } });
         const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
-        if (incomingIds.length > 0) {
-          for (const id of toDelete) {
-            const bul = existingItems.find(x => x.id === id);
-            await tx.bulletin.delete({ where: { id } });
-            await tx.auditLog.create({
-              data: {
-                actor: "API Sync",
-                action: "BULLETIN_DELETE",
-                details: `Deleted bulletin ${bul ? bul.title : id}`,
-                ipAddress: req.ip
-              }
-            });
-          }
+        for (const id of toDelete) {
+          const bul = existingItems.find(x => x.id === id);
+          await tx.bulletin.delete({ where: { id } });
+          await tx.auditLog.create({
+            data: {
+              actor: "API Sync",
+              action: "BULLETIN_DELETE",
+              details: `Deleted bulletin ${bul ? bul.title : id}`,
+              ipAddress: req.ip
+            }
+          });
         }
       }
 
@@ -3526,18 +3531,16 @@ app.post("/api/db/save", async (req, res) => {
         const incomingIds = translatedVal.map((x: any) => x.id);
         const existingItems = await tx.notification.findMany({ select: { id: true } });
         const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
-        if (incomingIds.length > 0) {
-          for (const id of toDelete) {
-            await tx.notification.delete({ where: { id } });
-            await tx.auditLog.create({
-              data: {
-                actor: "API Sync",
-                action: "NOTIFICATION_DELETE",
-                details: `Deleted notification ${id}`,
-                ipAddress: req.ip
-              }
-            });
-          }
+        for (const id of toDelete) {
+          await tx.notification.delete({ where: { id } });
+          await tx.auditLog.create({
+            data: {
+              actor: "API Sync",
+              action: "NOTIFICATION_DELETE",
+              details: `Deleted notification ${id}`,
+              ipAddress: req.ip
+            }
+          });
         }
       }
 
@@ -3583,19 +3586,17 @@ app.post("/api/db/save", async (req, res) => {
         const incomingIds = translatedVal.map((x: any) => x.id);
         const existingItems = await tx.homeReview.findMany({ select: { id: true, title: true } });
         const toDelete = existingItems.map(x => x.id).filter(id => !incomingIds.includes(id));
-        if (incomingIds.length > 0) {
-          for (const id of toDelete) {
-            const rev = existingItems.find(x => x.id === id);
-            await tx.homeReview.delete({ where: { id } });
-            await tx.auditLog.create({
-              data: {
-                actor: "API Sync",
-                action: "HOME_REVIEW_DELETE",
-                details: `Deleted review ${rev ? rev.title : id}`,
-                ipAddress: req.ip
-              }
-            });
-          }
+        for (const id of toDelete) {
+          const rev = existingItems.find(x => x.id === id);
+          await tx.homeReview.delete({ where: { id } });
+          await tx.auditLog.create({
+            data: {
+              actor: "API Sync",
+              action: "HOME_REVIEW_DELETE",
+              details: `Deleted review ${rev ? rev.title : id}`,
+              ipAddress: req.ip
+            }
+          });
         }
       }
     });
